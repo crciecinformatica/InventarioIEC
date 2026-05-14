@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model usuarios {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nome       String
+  email      String    @unique
+  senha_hash String
+  perfil     String?   @default("viewer")
+  ativo      Boolean?  @default(true)
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model setores {
+  id                    String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nome                  String          @unique
+  descricao             String?
+  ativo                 Boolean         @default(true)
+  created_at            DateTime?       @default(now()) @db.Timestamptz(6)
+  aparelhos             aparelhos[]
+  colaboradores         colaboradores[]
+  impressoras           impressoras[]
+  maquinas              maquinas[]
+  notebooks_emprestados notebooks[]     @relation("EmprestimoSetor")
+  notebooks             notebooks[]
+  racks                 racks[]
+  ramais                ramais[]
+
+  @@index([ativo], map: "idx_setores_ativo")
+  @@index([nome], map: "idx_setores_nome")
+}
+
+model colaboradores {
+  id                    String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  codigo                Int?
+  nome                  String
+  setor                 String?
+  status                status_colaborador    @default(Ativo)
+  created_at            DateTime?             @default(now()) @db.Timestamptz(6)
+  setor_id              String?               @db.Uuid
+  alocacoes_aparelhos   alocacoes_aparelhos[]
+  alocacoes_maquinas    alocacoes_maquinas[]
+  alocacoes_notebooks   alocacoes_notebooks[]
+  alocacoes_ramais      alocacoes_ramais[]
+  setor_rel             setores?              @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
+  movimentacoes         movimentacoes[]
+  notebooks_emprestados notebooks[]           @relation("EmprestimoColaborador")
+
+  @@index([nome], map: "idx_colaboradores_nome")
+  @@index([setor], map: "idx_colaboradores_setor")
+}
+
+model maquinas {
+  id                 String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nome_host          String?
+  identificador      String?
+  fabricante         String?
+  modelo             String?
+  categoria          categoria_equipamento?
+  tipo               String?
+  processador        String?
+  memoria_ram        String?
+  armazenamento      String?
+  endereco_ip        String?
+  localizacao        String?
+  setor              String?
+  patrimonio_cpu     String?
+  patrimonio_monitor String?
+  data_revisao       DateTime?              @db.Date
+  created_at         DateTime?              @default(now()) @db.Timestamptz(6)
+  setor_id           String?                @db.Uuid
+  alocacoes          alocacoes_maquinas[]
+  setor_rel          setores?               @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
+
+  @@index([identificador], map: "idx_maquinas_identificador")
+  @@index([setor], map: "idx_maquinas_setor")
+}
+
+model notebooks {
+  id                        String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  modelo                    String?
+  fabricante                String?
+  categoria                 categoria_equipamento?
+  processador               String?
+  memoria                   String?
+  armazenamento             String?
+  numero_patrimonio         String?
+  setor                     String?
+  created_at                DateTime?              @default(now()) @db.Timestamptz(6)
+  setor_id                  String?                @db.Uuid
+  emprestado                Boolean                @default(false)
+  emprestado_setor_id       String?                @db.Uuid
+  emprestado_colaborador_id String?                @db.Uuid
+  emprestado_desde          DateTime?              @db.Date
+  emprestado_obs            String?
+  data_revisao              DateTime?              @db.Date
+  alocacoes                 alocacoes_notebooks[]
+  emprestado_colaborador    colaboradores?         @relation("EmprestimoColaborador", fields: [emprestado_colaborador_id], references: [id], onUpdate: NoAction)
+  emprestado_setor          setores?               @relation("EmprestimoSetor", fields: [emprestado_setor_id], references: [id], onUpdate: NoAction)
+  setor_rel                 setores?               @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
+
+  @@index([emprestado_colaborador_id], map: "idx_notebooks_emprestado_colab")
+}
+
+model aparelhos {
+  id           String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  modelo       String?
+  tipo         Int?
+  chip         Boolean?              @default(false)
+  endereco_ip  String?
+  endereco_mac String?
+  setor        String?
+  status       Boolean?              @default(true)
+  created_at   DateTime?             @default(now()) @db.Timestamptz(6)
+  setor_id     String?               @db.Uuid
+  alocacoes    alocacoes_aparelhos[]
+  setor_rel    setores?              @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
+}
+
+model impressoras {
+  id                 String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nome_host          String?
+  fabricante         String?
+  modelo             String?
+  numero_serie       String?
+  endereco_ip        String?
+  localidade         String?
+  andar              String?
+  servidor_impressao String?
+  identificador_selb String?
+  tipo_usuario       String?
+  revisao            DateTime? @db.Timestamptz(6)
+  status             Boolean?  @default(true)
+  created_at         DateTime? @default(now()) @db.Timestamptz(6)
+  setor_id           String?   @db.Uuid
+  setor_rel          setores?  @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
+}
+
+model ramais {
+  id                  String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  numero_ramal        String?
+  nome_setor          String?
+  prefixo_telefonico  String?
+  disponibilidade     String?
+  fila                Boolean?           @default(false)
+  contemplacao        Boolean?           @default(false)
+  status_contemplacao Int?
+  senha_acesso        String?
+  created_at          DateTime?          @default(now()) @db.Timestamptz(6)
+  setor_id            String?            @db.Uuid
+  password            String?
+  alocacoes           alocacoes_ramais[]
+  setor_rel           setores?           @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
+}
+
+model racks {
+  id                      String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nome_switch             String?
+  marca_switch            String?
+  localizacao             String?
+  numero_patrimonio       String?
+  quantidade_portas       Int?
+  portas_em_uso           Int?
+  portas_livres           Int?
+  portas_academicas       String?
+  portas_vlan_impressoras String?
+  created_at              DateTime? @default(now()) @db.Timestamptz(6)
+  setor_id                String?   @db.Uuid
+  setor_rel               setores?  @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
+}
+
+model alocacoes_maquinas {
+  id             String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  colaborador_id String?        @db.Uuid
+  maquina_id     String?        @db.Uuid
+  data_inicio    DateTime?      @db.Date
+  data_fim       DateTime?      @db.Date
+  tipo_uso       Int?
+  ativo          Boolean?       @default(true)
+  created_at     DateTime?      @default(now()) @db.Timestamptz(6)
+  colaborador    colaboradores? @relation(fields: [colaborador_id], references: [id], onUpdate: NoAction)
+  maquina        maquinas?      @relation(fields: [maquina_id], references: [id], onUpdate: NoAction)
+
+  @@index([colaborador_id], map: "idx_alocacoes_maquinas_colaborador")
+  @@index([maquina_id], map: "idx_alocacoes_maquinas_maquina")
+}
+
+model alocacoes_notebooks {
+  id              String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  colaborador_id  String?        @db.Uuid
+  notebook_id     String?        @db.Uuid
+  data_inicio     DateTime?      @db.Date
+  data_fim        DateTime?      @db.Date
+  motivo_alocacao String?
+  tipo_posse      Int?
+  ativo           Boolean?       @default(true)
+  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  colaborador     colaboradores? @relation(fields: [colaborador_id], references: [id], onUpdate: NoAction)
+  notebook        notebooks?     @relation(fields: [notebook_id], references: [id], onUpdate: NoAction)
+
+  @@index([colaborador_id], map: "idx_alocacoes_notebooks_colaborador")
+}
+
+model alocacoes_aparelhos {
+  id                 String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  colaborador_id     String?        @db.Uuid
+  aparelho_id        String?        @db.Uuid
+  data_inicio        DateTime?      @db.Date
+  data_fim           DateTime?      @db.Date
+  descricao_alocacao String?
+  motivo_alocacao    String?
+  tipo_uso           Int?
+  observacoes        String?
+  ativo              Boolean?       @default(true)
+  created_at         DateTime?      @default(now()) @db.Timestamptz(6)
+  aparelho           aparelhos?     @relation(fields: [aparelho_id], references: [id], onUpdate: NoAction)
+  colaborador        colaboradores? @relation(fields: [colaborador_id], references: [id], onUpdate: NoAction)
+
+  @@index([colaborador_id], map: "idx_alocacoes_aparelhos_colaborador")
+}
+
+model alocacoes_ramais {
+  id              String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  colaborador_id  String?        @db.Uuid
+  ramal_id        String?        @db.Uuid
+  data_inicio     DateTime?      @db.Date
+  data_fim        DateTime?      @db.Date
+  tipo_base       Int?
+  canal_adicional String?
+  whatsapp        Boolean?       @default(false)
+  ativo           Boolean?       @default(true)
+  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  colaborador     colaboradores? @relation(fields: [colaborador_id], references: [id], onUpdate: NoAction)
+  ramal           ramais?        @relation(fields: [ramal_id], references: [id], onUpdate: NoAction)
+
+  @@index([colaborador_id], map: "idx_alocacoes_ramais_colaborador")
+}
+
+model movimentacoes {
+  id                        String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  data_movimentacao         DateTime?      @db.Date
+  identificador_dispositivo String?
+  tipo_dispositivo          Int?
+  tipo_movimentacao         Int?
+  colaborador_id            String?        @db.Uuid
+  setor                     String?
+  tecnico_responsavel       String?
+  observacao                String?
+  created_at                DateTime?      @default(now()) @db.Timestamptz(6)
+  colaborador               colaboradores? @relation(fields: [colaborador_id], references: [id], onUpdate: NoAction)
+}
+
+model solicitacoes {
+  id                        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  data_criacao              DateTime? @db.Date
+  colaborador_relacionado   String?
+  identificador_dispositivo String?
+  tipo_dispositivo          Int?
+  tipo_solicitacao          Int?
+  status_solicitacao        Int?
+  prioridade                Int?
+  origem_solicitacao        Int?
+  solicitante               String?
+  observacao                String?
+  created_at                DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model audit_log {
+  id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tabela           String
+  registro_id      String
+  acao             String
+  descricao        String?
+  dados_anteriores Json?
+  dados_novos      Json?
+  usuario_id       String?   @db.Uuid
+  usuario_nome     String?
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([tabela], map: "idx_audit_log_tabela")
+  @@index([registro_id], map: "idx_audit_log_registro_id")
+  @@index([created_at(sort: Desc)], map: "idx_audit_log_created_at")
+}
+
+enum categoria_equipamento {
+  Administrativa
+  Academica
+}
+
+enum status_colaborador {
+  Ativo
+  Inativo
+}
+
+

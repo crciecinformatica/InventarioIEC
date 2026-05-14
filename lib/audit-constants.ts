@@ -1,0 +1,45 @@
+export interface AuditLog {
+  id: string
+  tabela: string
+  registro_id: string
+  acao: string
+  descricao: string | null
+  dados_anteriores: unknown
+  dados_novos: unknown
+  usuario_id: string | null
+  usuario_nome: string | null
+  created_at: string | null
+}
+
+export const ACAO_COLORS: Record<string, string> = {
+  CREATE:          'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
+  UPDATE:          'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+  DELETE:          'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
+  ALOCAR:          'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300',
+  DESALOCAR:       'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
+  EDITAR_ALOCACAO: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+}
+
+export const ACAO_LABELS: Record<string, string> = {
+  CREATE:          'Criação',
+  UPDATE:          'Edição',
+  DELETE:          'Exclusão',
+  ALOCAR:          'Alocação',
+  DESALOCAR:       'Desalocação',
+  EDITAR_ALOCACAO: 'Edição de Alocação',
+}
+
+export const TABELAS_OPCOES = [
+  { value: 'maquinas',            label: 'Máquinas' },
+  { value: 'notebooks',           label: 'Notebooks' },
+  { value: 'aparelhos',           label: 'Aparelhos' },
+  { value: 'impressoras',         label: 'Impressoras' },
+  { value: 'ramais',              label: 'Ramais' },
+  { value: 'racks',               label: 'Racks' },
+  { value: 'colaboradores',       label: 'Colaboradores' },
+  { value: 'movimentacoes',       label: 'Movimentações' },
+  { value: 'alocacoes_maquinas',  label: 'Alocações — Máquinas' },
+  { value: 'alocacoes_notebooks', label: 'Alocações — Notebooks' },
+  { value: 'alocacoes_aparelhos', label: 'Alocações — Aparelhos' },
+  { value: 'alocacoes_ramais',    label: 'Alocações — Ramais' },
+]

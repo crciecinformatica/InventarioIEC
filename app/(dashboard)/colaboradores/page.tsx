@@ -1,0 +1,328 @@
+'use client'
+import { usePermission } from '@/hooks/use-permission'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { type ColumnDef } from '@tanstack/react-table'
+import { DataTable } from '@/components/tables/data-table'
+import { ColaboradorOverviewPanel, type OverviewFilter, notifyOverviewFilter } from '@/components/tables/device-overview-panel'
+import { PageHeader } from '@/components/layout/page-header'
+import { StatusBadge } from '@/components/dashboard/status-badge'
+import { ColaboradorModal } from '@/components/modals/colaborador-modal'
+import { SetorSelect } from '@/components/modals/setor-select'
+import { LocalidadeSelect } from '@/components/modals/localidade-select'
+import { Search } from 'lucide-react'
+import type { Colaborador, PaginatedResponse } from '@/types'
+import { CriarColaboradorModal } from '@/components/modals/criar-colaborador-modal'
+import { Plus } from 'lucide-react'
+
+type ActiveOverviewFilter = OverviewFilter & {
+  key: string
+  predicate: (item: Colaborador) => boolean
+}
+
+const columns: ColumnDef<Colaborador>[] = [
+  { accessorKey: 'codigo', header: 'Código', cell: ({ getValue }) => getValue() || '—', enableSorting: true},
+  { accessorKey: 'nome', enableSorting: true, header: 'Nome', cell: ({ getValue }) => <span className="font-medium">{getValue() as string}</span> },
+  {
+    accessorKey: 'setor',
+    header: 'Setor',
+    enableSorting: false,
+    cell: ({ row }) => row.original.setor_nome ?? '—',
+  },
+  {
+    accessorKey: 'localidade_nome',
+    header: 'Localidade',
+    cell: ({ row }) => row.original.localidade_nome ?? '—',
+  },
+  {
+    accessorKey: 'status', header: 'Status', enableSorting: false,
+    cell: ({ getValue }) => <StatusBadge status={getValue() as string} />,
+  },
+]
+
+export default function ColaboradoresPage() {
+  const searchParams = useSearchParams()
+  const { isAdmin } = usePermission()
+  const [data, setData] = useState<Colaborador[]>([])
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [overviewData, setOverviewData] = useState<Colaborador[]>([])
+  const [overviewTotal, setOverviewTotal] = useState(0)
+  const [overviewLoading, setOverviewLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState<Colaborador | null>(null)
+  const [showCriar, setShowCriar] = useState(false)
+  const [search, setSearch] = useState(searchParams.get('search') || '')
+  const [setorIdFiltro, setSetorIdFiltro] = useState<string | null>(searchParams.get('setor_id'))
+  const [localidadeIdFiltro, setLocalidadeIdFiltro] = useState<string | null>(searchParams.get('localidade_id'))
+  const [status, setStatus] = useState(searchParams.get('status') || '')
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [activeOverviewFilters, setActiveOverviewFilters] = useState<ActiveOverviewFilter[]>([])
+  const [overviewFilterLoading, setOverviewFilterLoading] = useState(false)
+
+  const [sort, setSort] = useState('nome')
+  const [dir, setDir]   = useState<'asc' | 'desc'>('asc')
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    const params = new URLSearchParams({ page: String(page), limit: '20' })
+    if (search) params.set('search', search)
+    if (setorIdFiltro) params.set('setor_id', setorIdFiltro)
+    if (localidadeIdFiltro) params.set('localidade_id', localidadeIdFiltro)
+    if (status) params.set('status', status)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
+    const res = await fetch(`/api/colaboradores?${params}`)
+    const json: PaginatedResponse<Colaborador> = await res.json()
+    setData(json.data)
+    setTotal(json.total)
+    setTotalPages(json.totalPages)
+    setLoading(false)
+  }, [page, search, setorIdFiltro, localidadeIdFiltro, status, sort, dir])
+
+  useEffect(() => { void Promise.resolve().then(fetchData) }, [fetchData, refreshKey])
+
+  const filteredOverviewData = activeOverviewFilters.length > 0
+    ? overviewData.filter(item => matchesOverviewFilters(item, activeOverviewFilters))
+    : null
+  const activeSectorFilters = activeOverviewFilters.filter(filter => filter.kind === 'collaborator-sector')
+  const selectedSectorOverviewData = activeSectorFilters.length > 0
+    ? overviewData.filter(item => activeSectorFilters.some(filter => filter.predicate(item)))
+    : null
+  const metricOverviewData = selectedSectorOverviewData ?? overviewData
+  const metricOverviewTotal = selectedSectorOverviewData ? selectedSectorOverviewData.length : overviewTotal || total
+  const tableData = filteredOverviewData
+    ? filteredOverviewData.slice((page - 1) * 20, page * 20)
+    : data
+  const tableTotal = filteredOverviewData?.length ?? total
+  const tableTotalPages = filteredOverviewData ? Math.max(1, Math.ceil(filteredOverviewData.length / 20)) : totalPages
+
+  function applyOverviewFilter(filter: OverviewFilter) {
+    if (filter.kind === 'all') {
+      setActiveOverviewFilters([])
+      setPage(1)
+      notifyOverviewFilter([])
+      return
+    }
+
+    const predicates: Record<string, { label: string; toastLabel?: string; predicate: (item: Colaborador) => boolean }> = {
+      'collaborator-status': {
+        label: `Colaboradores ${filter.value ?? ''}`,
+        predicate: (item) => item.status === filter.value,
+      },
+      'collaborator-sector': {
+        label: `Setor: ${filter.value ?? 'Sem setor'}`,
+        predicate: (item) => getColaboradorSetor(item) === filter.value,
+      },
+      location: {
+        label: filter.label ?? 'Unidade selecionada',
+        predicate: (item) => filter.value === '__sem_localidade__' ? !item.localidade_id : item.localidade_id === filter.value,
+      },
+      'collaborator-without-any': {
+        label: 'Colaboradores sem alocacao',
+        predicate: (item) => item.status === 'Ativo' && !item.alocacoes_maquinas_ativas && !item.alocacoes_notebooks_ativas && !item.alocacoes_aparelhos_ativas && !item.alocacoes_ramais_ativas,
+      },
+      'collaborator-without-machine': {
+        label: 'Colaboradores sem maquina',
+        toastLabel: 'sem maquina dispositivo',
+        predicate: (item) => item.status === 'Ativo' && !item.alocacoes_maquinas_ativas,
+      },
+      'collaborator-without-notebook': {
+        label: 'Colaboradores sem notebook',
+        toastLabel: 'sem notebook dispositivo',
+        predicate: (item) => item.status === 'Ativo' && !item.alocacoes_notebooks_ativas,
+      },
+      'collaborator-without-phone': {
+        label: 'Colaboradores sem telefone',
+        toastLabel: 'sem telefone dispositivo',
+        predicate: (item) => item.status === 'Ativo' && !item.alocacoes_aparelhos_ativas,
+      },
+      'collaborator-without-extension': {
+        label: 'Colaboradores sem ramal',
+        toastLabel: 'sem ramal dispositivo',
+        predicate: (item) => item.status === 'Ativo' && !item.alocacoes_ramais_ativas,
+      },
+    }
+
+    const nextFilter = predicates[filter.kind]
+    if (!nextFilter) return
+    const candidate: ActiveOverviewFilter = {
+      ...filter,
+      key: getOverviewFilterKey(filter),
+      label: nextFilter.toastLabel ?? nextFilter.label,
+      predicate: nextFilter.predicate,
+    }
+
+    setOverviewFilterLoading(true)
+    window.setTimeout(() => {
+      setActiveOverviewFilters((currentFilters) => {
+        const nextFilters = toggleOverviewFilter(currentFilters, candidate)
+        notifyOverviewFilter(nextFilters)
+        return nextFilters
+      })
+      setPage(1)
+      setOverviewFilterLoading(false)
+    }, 120)
+  }
+
+  useEffect(() => {
+    if (!setorIdFiltro || overviewData.length === 0) return
+    const setorIds = new Set(setorIdFiltro.split(',').map(id => id.trim()).filter(Boolean))
+    const sectorNames = Array.from(new Set(
+      overviewData
+        .filter(item => item.setor_id && setorIds.has(item.setor_id))
+        .map(getColaboradorSetor)
+        .filter((name): name is string => Boolean(name))
+    ))
+    if (sectorNames.length === 0) return
+    void Promise.resolve().then(() => {
+      setActiveOverviewFilters((currentFilters) => {
+        const nextFilters = [...currentFilters]
+        for (const sectorName of sectorNames) {
+          if (nextFilters.some(filter => filter.key === `collaborator-sector:${sectorName}`)) continue
+          nextFilters.push({
+          kind: 'collaborator-sector',
+          value: sectorName,
+          label: `Setor: ${sectorName}`,
+          key: `collaborator-sector:${sectorName}`,
+          predicate: (item) => getColaboradorSetor(item) === sectorName,
+          })
+        }
+        return nextFilters
+      })
+    })
+  }, [setorIdFiltro, overviewData])
+
+  useEffect(() => {
+    let cancelled = false
+    async function fetchOverview() {
+      setOverviewLoading(true)
+      try {
+        const params = new URLSearchParams({ page: '1', limit: '10000', sort: 'nome', dir: 'asc', overview: 'true' })
+        if (localidadeIdFiltro) params.set('localidade_id', localidadeIdFiltro)
+        const res = await fetch(`/api/colaboradores?${params}`)
+        const json: PaginatedResponse<Colaborador> = await res.json()
+        if (!cancelled) {
+          setOverviewData(json.data)
+          setOverviewTotal(json.total)
+        }
+      } catch (error) {
+        console.error('[colaboradores overview]', error)
+      } finally {
+        if (!cancelled) setOverviewLoading(false)
+      }
+    }
+
+    fetchOverview()
+    return () => { cancelled = true }
+  }, [refreshKey, localidadeIdFiltro])
+  
+  const filters = (
+    <>
+      <div className="relative flex-1 min-w-[200px]">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <input
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+          placeholder="Buscar por nome..."
+          className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+      <SetorSelect
+        value={setorIdFiltro}
+        onChange={(value) => {
+          setSetorIdFiltro(value)
+          setPage(1)
+        }}
+        placeholder="Filtrar por setor..."
+      />
+      <LocalidadeSelect
+        value={localidadeIdFiltro}
+        onChange={(value) => {
+          setLocalidadeIdFiltro(value)
+          setSetorIdFiltro(null)
+          setPage(1)
+        }}
+        placeholder="Filtrar por localidade..."
+      />
+      <select
+        value={status}
+        onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+        className="px-4 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">Todos os status</option>
+        <option value="Ativo">Ativo</option>
+        <option value="Inativo">Inativo</option>
+      </select>
+    </>
+  )
+
+  return (
+    <div className="p-4 md:p-6 max-w-screen-2xl mx-auto">
+      <PageHeader title="Colaboradores" total={total}>
+        {isAdmin && (<button type="button" onClick={() => setShowCriar(true)}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
+          <Plus className="w-4 h-4" /> Novo colaborador
+        </button>)}
+      </PageHeader>
+      <ColaboradorOverviewPanel
+        total={overviewTotal || total}
+        items={overviewData}
+        metricTotal={metricOverviewTotal}
+        metricItems={metricOverviewData}
+        activeFilters={activeOverviewFilters}
+        isLoading={overviewLoading}
+        onFilter={applyOverviewFilter}
+      />
+      <DataTable
+        columns={columns}
+        data={tableData}
+        total={tableTotal}
+        page={page}
+        totalPages={tableTotalPages}
+        onPageChange={setPage}
+        onRowClick={setSelected}
+        isLoading={loading || overviewFilterLoading}
+        filters={filters}
+        sort={sort}
+        dir={dir}
+        onSort={(field, newDir) => { setSort(field); setDir(newDir); setPage(1) }}
+      />
+      {selected && <ColaboradorModal colaborador={selected} onClose={() => setSelected(null)} onRefresh={() => setRefreshKey(k => k + 1)}/>}
+      {showCriar && <CriarColaboradorModal onClose={() => setShowCriar(false)} onRefresh={() => setRefreshKey(k => k + 1)} />}
+    </div>
+  )
+}
+
+function getColaboradorSetor(item?: Colaborador | null) {
+  return item?.setor_nome || 'Sem setor'
+}
+
+function getOverviewFilterKey(filter: OverviewFilter) {
+  return `${filter.kind}:${filter.value ?? ''}`
+}
+
+function toggleOverviewFilter(filters: ActiveOverviewFilter[], candidate: ActiveOverviewFilter) {
+  if (candidate.kind === 'location') {
+    const withoutLocation = filters.filter(filter => filter.kind !== 'location')
+    return candidate.value ? [...withoutLocation, candidate] : withoutLocation
+  }
+  const exists = filters.some(filter => filter.key === candidate.key)
+  if (exists) return filters.filter(filter => filter.key !== candidate.key)
+  return [...filters, candidate]
+}
+
+function matchesOverviewFilters(item: Colaborador, filters: ActiveOverviewFilter[]) {
+  const filtersByKind = filters.reduce((map, filter) => {
+    const group = map.get(filter.kind) ?? []
+    group.push(filter)
+    map.set(filter.kind, group)
+    return map
+  }, new Map<string, ActiveOverviewFilter[]>())
+
+  return Array.from(filtersByKind.values()).every(group =>
+    group.some(filter => filter.predicate(item))
+  )
+}
