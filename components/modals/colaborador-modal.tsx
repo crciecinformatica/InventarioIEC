@@ -1,9 +1,9 @@
 "use client";
-import { usePermission } from '@/hooks/use-permission'
+import { usePermission } from "@/hooks/use-permission";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Pencil, Trash2, Loader2 } from "lucide-react";
+import { X, Pencil, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/utils";
 import type { Colaborador } from "@/types";
 import { SetorSelect } from "./setor-select";
 import { LocalidadeSelect } from "./localidade-select";
+import { toast } from "sonner";
 
 const schema = z.object({
  nome: z.string().min(1, "Nome obrigatório"),
@@ -34,17 +35,26 @@ interface Props {
 type Tab = "info" | "alocacoes" | "historico";
 
 export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
- const { isAdmin } = usePermission()
+ const { isAdmin } = usePermission();
  const router = useRouter();
  const [mode, setMode] = useState<"view" | "edit">("view");
  const [tab, setTab] = useState<Tab>("info");
  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
  const [setorId, setSetorId] = useState<string | null>(
-  colaborador.setor_id ?? null
-)
+  colaborador.setor_id ?? null,
+ );
  const [localidadeId, setLocalidadeId] = useState<string | null>(
-  colaborador.localidade_id ?? null
-)
+  colaborador.localidade_id ?? null,
+ );
+ // Adicionar estados:
+ const [alocacoesAtivas, setAlocacoesAtivas] = useState<{
+  maquinas: any[];
+  notebooks: any[];
+  aparelhos: any[];
+  ramais: any[];
+ } | null>(null);
+ const [loadingAlocacoes, setLoadingAlocacoes] = useState(false);
+ const [inativando, setInativando] = useState(false);
 
  const { update, remove, saving, deleting } = useCrud("colaboradores", () => {
   onRefresh();
@@ -65,11 +75,15 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
  });
 
  function onSubmit(data: FormData) {
-  update(colaborador.id, { ...data, setor_id: setorId, localidade_id: localidadeId }, {
+  update(
+   colaborador.id,
+   { ...data, setor_id: setorId, localidade_id: localidadeId },
+   {
     previousData: colaborador,
     label: `Colaborador "${colaborador.nome}" atualizado`,
-  })
-}
+   },
+  );
+ }
 
  // Navegar para o item na respectiva página — fecha o modal e abre a página
  function handleNavigate(
@@ -78,6 +92,43 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
  ) {
   onClose();
   router.push(`/${tipo}?inspect=${itemId}`);
+ }
+
+ async function handleClickInativar() {
+  setLoadingAlocacoes(true);
+  try {
+   const res = await fetch(`/api/colaboradores/${colaborador.id}/alocacoes`);
+   if (res.ok) {
+    const data = await res.json();
+    setAlocacoesAtivas(data);
+   }
+  } catch {
+   /* silencioso */
+  } finally {
+   setLoadingAlocacoes(false);
+  }
+  setShowDeleteConfirm(true);
+ }
+
+ async function handleConfirmarInativar() {
+  setInativando(true);
+  try {
+   const res = await fetch(`/api/colaboradores/${colaborador.id}/inativar`, {
+    method: "POST",
+   });
+   if (!res.ok) throw new Error();
+   const data = await res.json();
+   toast.success(
+    `"${colaborador.nome}" inativado${data.totalDesalocados > 0 ? ` e ${data.totalDesalocados} alocação${data.totalDesalocados > 1 ? "ões" : ""} liberada${data.totalDesalocados > 1 ? "s" : ""}` : ""}.`,
+   );
+   onRefresh();
+   onClose();
+  } catch {
+   toast.error("Erro ao inativar colaborador.");
+  } finally {
+   setInativando(false);
+   setShowDeleteConfirm(false);
+  }
  }
 
  const inp =
@@ -154,8 +205,11 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
          label="Código de Pessoa"
          value={colaborador.codigo != null ? String(colaborador.codigo) : null}
         />
-      <DetailField label="Setor" value={colaborador.setor_nome ?? '—'} />
-        <DetailField label="Localidade" value={colaborador.localidade_nome ?? '—'} />
+        <DetailField label="Setor" value={colaborador.setor_nome ?? "—"} />
+        <DetailField
+         label="Localidade"
+         value={colaborador.localidade_nome ?? "—"}
+        />
         <DetailField
          label="Status"
          value={<StatusBadge status={colaborador.status} />}
@@ -237,18 +291,15 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
         </div>
         <div>
          <label className={lbl}>Setor</label>
-         <SetorSelect
-          value={setorId}
-          onChange={(id) =>
-           setSetorId(id)
-          }
-         />
+         <SetorSelect value={setorId} onChange={(id) => setSetorId(id)} />
         </div>
         <div>
          <label className={lbl}>Localidade</label>
          <LocalidadeSelect
           value={localidadeId}
-          onChange={(id) => { setLocalidadeId(id) }}
+          onChange={(id) => {
+           setLocalidadeId(id);
+          }}
          />
         </div>
        </form>
@@ -259,24 +310,34 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
      <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex gap-2">
       {mode === "view" ? (
        <>
-{isAdmin && (        <button
-         type="button"
-         onClick={() => setShowDeleteConfirm(true)}
-         className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition"
-        >
-         <Trash2 className="w-3.5 h-3.5" /> Excluir
-        </button>)}
-{isAdmin && (        <button
-         type="button"
-         onClick={(e) => {
-          e.preventDefault();
-          setMode("edit");
-          setTab("info");
-         }}
-         className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition"
-        >
-         <Pencil className="w-3.5 h-3.5" /> Editar
-        </button>)}
+        {isAdmin && (
+         <button
+          type="button"
+          onClick={handleClickInativar}
+          disabled={loadingAlocacoes}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition disabled:opacity-60"
+         >
+          {loadingAlocacoes ? (
+           <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+           <Trash2 className="w-3.5 h-3.5" />
+          )}
+          Inativar
+         </button>
+        )}
+        {isAdmin && (
+         <button
+          type="button"
+          onClick={(e) => {
+           e.preventDefault();
+           setMode("edit");
+           setTab("info");
+          }}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition"
+         >
+          <Pencil className="w-3.5 h-3.5" /> Editar
+         </button>
+        )}
        </>
       ) : (
        <>
@@ -305,14 +366,108 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
     </aside>
    </div>
 
-   {showDeleteConfirm && (
-    <ConfirmDialog
-     title="Excluir colaborador"
-     description={`Excluir "${colaborador.nome}"? Esta ação não pode ser desfeita.`}
-     onConfirm={() => remove(colaborador.id)}
-     onCancel={() => setShowDeleteConfirm(false)}
-     loading={deleting}
-    />
+   {showDeleteConfirm && alocacoesAtivas !== null && (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+     <div
+      className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+      onClick={() => setShowDeleteConfirm(false)}
+     />
+     <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-100 dark:border-slate-800">
+      <div className="flex items-center gap-3 mb-4">
+       <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950 flex items-center justify-center shrink-0">
+        <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+       </div>
+       <div>
+        <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+         Inativar colaborador
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+         Esta ação não pode ser desfeita.
+        </p>
+       </div>
+      </div>
+
+      {/* Aviso de alocações */}
+      {(() => {
+       const total =
+        (alocacoesAtivas.maquinas?.length ?? 0) +
+        (alocacoesAtivas.notebooks?.length ?? 0) +
+        (alocacoesAtivas.aparelhos?.length ?? 0) +
+        (alocacoesAtivas.ramais?.length ?? 0);
+
+       if (total === 0) {
+        return (
+         <p className="text-sm text-slate-600 dark:text-slate-400 mb-5">
+          Deseja inativar <strong>"{colaborador.nome}"</strong>? O colaborador
+          não possui alocações ativas.
+         </p>
+        );
+       }
+
+       const itens: string[] = [
+        ...alocacoesAtivas.maquinas.map(
+         (a: any) =>
+          `Máquina ${a.item?.endereco_ip ?? a.item?.nome_host ?? "—"}`,
+        ),
+        ...alocacoesAtivas.notebooks.map(
+         (a: any) => `Notebook ${a.item?.numero_patrimonio ?? "—"}`,
+        ),
+        ...alocacoesAtivas.aparelhos.map(
+         (a: any) => `Aparelho ${a.item?.modelo ?? "—"}`,
+        ),
+        ...alocacoesAtivas.ramais.map(
+         (a: any) => `Ramal ${a.item?.numero_ramal ?? "—"}`,
+        ),
+       ];
+
+       return (
+        <>
+         <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">
+          Deseja inativar <strong>"{colaborador.nome}"</strong>?
+         </p>
+         <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3 mb-4">
+          <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">
+           ⚠️ {total} alocação{total > 1 ? "ões" : ""} ativa
+           {total > 1 ? "s" : ""} será{total > 1 ? "ão" : ""} liberada
+           {total > 1 ? "s" : ""} automaticamente:
+          </p>
+          <ul className="space-y-1">
+           {itens.map((label, i) => (
+            <li
+             key={i}
+             className="text-xs text-amber-700 dark:text-amber-500 flex items-center gap-1.5"
+            >
+             <span className="w-1 h-1 rounded-full bg-amber-500 shrink-0" />
+             {label}
+            </li>
+           ))}
+          </ul>
+         </div>
+        </>
+       );
+      })()}
+
+      <div className="flex gap-2 justify-end">
+       <button
+        type="button"
+        onClick={() => setShowDeleteConfirm(false)}
+        disabled={inativando}
+        className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+       >
+        Cancelar
+       </button>
+       <button
+        type="button"
+        onClick={handleConfirmarInativar}
+        disabled={inativando}
+        className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition disabled:opacity-60"
+       >
+        {inativando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+        Confirmar inativação
+       </button>
+      </div>
+     </div>
+    </div>
    )}
   </>
  );
