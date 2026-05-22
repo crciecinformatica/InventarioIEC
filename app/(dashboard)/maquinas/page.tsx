@@ -14,6 +14,7 @@ import { LocalidadeSelect } from '@/components/modals/localidade-select'
 import { Search, Plus } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import type { Maquina, PaginatedResponse } from '@/types'
+import { useInspectNavigation } from '@/hooks/use-inspect-navigation'
 
 type ActiveOverviewFilter = OverviewFilter & {
   key: string
@@ -66,6 +67,7 @@ export default function MaquinasPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const searchParams = useSearchParams()
   const inspectId = searchParams.get('inspect')
+  const { openInspect, closeInspect } = useInspectNavigation<Maquina>(setSelected)
   const [activeOverviewFilters, setActiveOverviewFilters] = useState<ActiveOverviewFilter[]>([])
   const [overviewFilterLoading, setOverviewFilterLoading] = useState(false)
 
@@ -415,7 +417,7 @@ export default function MaquinasPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={loading || overviewFilterLoading}
         filters={filters}
         sort={sort}
@@ -426,7 +428,7 @@ export default function MaquinasPage() {
       {selected && (
         <MaquinaModal
           maquina={selected}
-          onClose={() => setSelected(null)}
+          onClose={closeInspect}
           onRefresh={refresh}
         />
       )}

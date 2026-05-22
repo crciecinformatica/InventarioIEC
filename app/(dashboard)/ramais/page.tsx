@@ -14,6 +14,7 @@ import { Search, Plus } from 'lucide-react'
 import type { Ramal, PaginatedResponse } from '@/types'
 import { SetorSelect } from '@/components/modals/setor-select'
 import { LocalidadeSelect } from '@/components/modals/localidade-select'
+import { useInspectNavigation } from '@/hooks/use-inspect-navigation'
 
 type ActiveOverviewFilter = OverviewFilter & {
   key: string
@@ -77,6 +78,7 @@ export default function RamaisPage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Ramal | null>(null)
+  const { openInspect, closeInspect } = useInspectNavigation<Ramal>(setSelected)
   const [showCriar, setShowCriar] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [activeOverviewFilters, setActiveOverviewFilters] = useState<ActiveOverviewFilter[]>([])
@@ -446,7 +448,7 @@ export default function RamaisPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={loading || overviewFilterLoading}
         filters={filters}
         sort={sort}
@@ -460,7 +462,7 @@ export default function RamaisPage() {
       {selected && (
         <RamalModal
           ramal={selected}
-          onClose={() => setSelected(null)}
+          onClose={closeInspect}
           onRefresh={refresh}
         />
       )}

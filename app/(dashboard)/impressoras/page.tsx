@@ -17,6 +17,7 @@ import { CriarImpressoraModal } from "@/components/modals/criar-impressora-modal
 import { SetorSelect } from "@/components/modals/setor-select";
 import { LocalidadeSelect } from "@/components/modals/localidade-select";
 import { Search, Plus } from "lucide-react";
+import { useInspectNavigation } from "@/hooks/use-inspect-navigation";
 
 import type { Impressora, PaginatedResponse } from "@/types";
 
@@ -70,6 +71,8 @@ export default function ImpressorasPage() {
   const [loading, setLoading] = useState(true);
 
   const [selected, setSelected] = useState<Impressora | null>(null);
+  const { openInspect, closeInspect } =
+    useInspectNavigation<Impressora>(setSelected);
 
   const [search, setSearch] = useState("");
 
@@ -499,7 +502,7 @@ export default function ImpressorasPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={loading || overviewFilterLoading}
         filters={filters}
         sort={sort}
@@ -510,7 +513,7 @@ export default function ImpressorasPage() {
       {selected && (
         <ImpressoraModal
           impressora={selected}
-          onClose={() => setSelected(null)}
+          onClose={closeInspect}
           onRefresh={() => setRefreshKey((k) => k + 1)}
         />
       )}

@@ -19,6 +19,7 @@ import { mapTipoAparelho } from "@/lib/utils";
 import type { Aparelho, PaginatedResponse } from "@/types";
 import { CriarAparelhoModal } from "@/components/modals/criar-aparelho-modal";
 import { useSearchParams } from "next/navigation";
+import { useInspectNavigation } from "@/hooks/use-inspect-navigation";
 
 type ActiveOverviewFilter = OverviewFilter & {
   key: string;
@@ -152,6 +153,8 @@ export default function AparelhosPage() {
 
   const [selected, setSelected] =
     useState<Aparelho | null>(null);
+  const { openInspect, closeInspect } =
+    useInspectNavigation<Aparelho>(setSelected);
 
   const [showCriar, setShowCriar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -715,7 +718,7 @@ export default function AparelhosPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={
           loading || overviewFilterLoading
         }
@@ -732,7 +735,7 @@ export default function AparelhosPage() {
       {selected && (
         <AparelhoModal
           aparelho={selected}
-          onClose={() => setSelected(null)}
+          onClose={closeInspect}
           onRefresh={refresh}
         />
       )}

@@ -24,6 +24,7 @@ import { LocalidadeSelect } from "@/components/modals/localidade-select";
 import { Search, Plus } from "lucide-react";
 
 import { formatDate } from "@/lib/utils";
+import { useInspectNavigation } from "@/hooks/use-inspect-navigation";
 
 import type { Notebook, PaginatedResponse } from "@/types";
 
@@ -80,6 +81,8 @@ export default function NotebooksPage() {
   const [loading, setLoading] = useState(true);
 
   const [selected, setSelected] = useState<Notebook | null>(null);
+  const { openInspect, closeInspect } =
+    useInspectNavigation<Notebook>(setSelected);
   const [showCriar, setShowCriar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -779,7 +782,7 @@ export default function NotebooksPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={
           loading ||
           overviewFilterLoading
@@ -800,9 +803,7 @@ export default function NotebooksPage() {
       {selected && (
         <NotebookModal
           notebook={selected}
-          onClose={() =>
-            setSelected(null)
-          }
+          onClose={closeInspect}
           onRefresh={refresh}
         />
       )}

@@ -85,12 +85,11 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
   );
  }
 
- // Navegar para o item na respectiva página — fecha o modal e abre a página
+ // Navegar para o item na respectiva página preservando o contexto atual.
  function handleNavigate(
   tipo: "maquinas" | "notebooks" | "aparelhos" | "ramais",
   itemId: string,
  ) {
-  onClose();
   router.push(`/${tipo}?inspect=${itemId}`);
  }
 

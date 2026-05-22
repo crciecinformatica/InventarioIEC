@@ -15,6 +15,7 @@ import { Search } from 'lucide-react'
 import type { Colaborador, PaginatedResponse } from '@/types'
 import { CriarColaboradorModal } from '@/components/modals/criar-colaborador-modal'
 import { Plus } from 'lucide-react'
+import { useInspectNavigation } from '@/hooks/use-inspect-navigation'
 
 type ActiveOverviewFilter = OverviewFilter & {
   key: string
@@ -43,6 +44,7 @@ const columns: ColumnDef<Colaborador>[] = [
 
 export default function ColaboradoresPage() {
   const searchParams = useSearchParams()
+  const inspectId = searchParams.get('inspect')
   const { isAdmin } = usePermission()
   const [data, setData] = useState<Colaborador[]>([])
   const [total, setTotal] = useState(0)
@@ -64,6 +66,7 @@ export default function ColaboradoresPage() {
 
   const [sort, setSort] = useState('nome')
   const [dir, setDir]   = useState<'asc' | 'desc'>('asc')
+  const { openInspect, closeInspect } = useInspectNavigation<Colaborador>(setSelected)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -83,6 +86,29 @@ export default function ColaboradoresPage() {
   }, [page, search, setorIdFiltro, localidadeIdFiltro, status, sort, dir])
 
   useEffect(() => { void Promise.resolve().then(fetchData) }, [fetchData, refreshKey])
+
+  useEffect(() => {
+    if (!inspectId) return
+    const found = data.find(item => item.id === inspectId) ?? overviewData.find(item => item.id === inspectId)
+    if (!found) return
+
+    const timeout = window.setTimeout(() => setSelected(found), 0)
+    return () => window.clearTimeout(timeout)
+  }, [inspectId, data, overviewData])
+
+  useEffect(() => {
+    if (!inspectId) return
+    let cancelled = false
+
+    fetch(`/api/colaboradores/${inspectId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then((item: Colaborador | null) => {
+        if (!cancelled && item) setSelected(item)
+      })
+      .catch(() => {})
+
+    return () => { cancelled = true }
+  }, [inspectId])
 
   const filteredOverviewData = activeOverviewFilters.length > 0
     ? overviewData.filter(item => matchesOverviewFilters(item, activeOverviewFilters))
@@ -283,14 +309,14 @@ export default function ColaboradoresPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={loading || overviewFilterLoading}
         filters={filters}
         sort={sort}
         dir={dir}
         onSort={(field, newDir) => { setSort(field); setDir(newDir); setPage(1) }}
       />
-      {selected && <ColaboradorModal colaborador={selected} onClose={() => setSelected(null)} onRefresh={() => setRefreshKey(k => k + 1)}/>}
+      {selected && <ColaboradorModal colaborador={selected} onClose={closeInspect} onRefresh={() => setRefreshKey(k => k + 1)}/>}
       {showCriar && <CriarColaboradorModal onClose={() => setShowCriar(false)} onRefresh={() => setRefreshKey(k => k + 1)} />}
     </div>
   )

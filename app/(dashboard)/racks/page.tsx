@@ -20,6 +20,7 @@ import { SetorSelect } from "@/components/modals/setor-select";
 import { LocalidadeSelect } from "@/components/modals/localidade-select";
 
 import { Search, Plus } from "lucide-react";
+import { useInspectNavigation } from "@/hooks/use-inspect-navigation";
 
 import type { Rack, PaginatedResponse } from "@/types";
 
@@ -51,6 +52,8 @@ export default function RacksPage() {
     useState<ActiveOverviewFilter[]>([]);
 
   const [selected, setSelected] = useState<Rack | null>(null);
+  const { openInspect, closeInspect } =
+    useInspectNavigation<Rack>(setSelected);
   const [showCriar, setShowCriar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -506,7 +509,7 @@ export default function RacksPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={
           loading || overviewFilterLoading
         }
@@ -523,7 +526,7 @@ export default function RacksPage() {
       {selected && (
         <RackModal
           rack={selected}
-          onClose={() => setSelected(null)}
+          onClose={closeInspect}
           onRefresh={refresh}
         />
       )}
