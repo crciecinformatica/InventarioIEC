@@ -18,6 +18,8 @@ import type { Colaborador } from "@/types";
 import { SetorSelect } from "./setor-select";
 import { LocalidadeSelect } from "./localidade-select";
 import { toast } from "sonner";
+import { AnimatedDialogFrame, AnimatedSheetFrame } from "@/components/layout/motion-primitives";
+import { writePendingInspectPreview } from "@/lib/navigation-context";
 
 const schema = z.object({
  nome: z.string().min(1, "Nome obrigatório"),
@@ -89,8 +91,11 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
  function handleNavigate(
   tipo: "maquinas" | "notebooks" | "aparelhos" | "ramais",
   itemId: string,
+  preview?: { title: string; subtitle?: string },
  ) {
-  router.push(`/${tipo}?inspect=${itemId}`);
+  const href = `/${tipo}?inspect=${itemId}`;
+  if (preview) writePendingInspectPreview(window.sessionStorage, href, preview);
+  router.push(href);
  }
 
  async function handleClickInativar() {
@@ -143,9 +148,7 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
 
  return (
   <>
-   <div className="fixed inset-0 z-50 flex">
-    <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-    <aside className="w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+   <AnimatedSheetFrame onClose={onClose}>
      {/* Header */}
      <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
       <div>
@@ -362,16 +365,14 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
        </>
       )}
      </div>
-    </aside>
-   </div>
+   </AnimatedSheetFrame>
 
    {showDeleteConfirm && alocacoesAtivas !== null && (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
-     <div
-      className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-      onClick={() => setShowDeleteConfirm(false)}
-     />
-     <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 border border-slate-100 dark:border-slate-800">
+    <AnimatedDialogFrame
+     onClose={() => setShowDeleteConfirm(false)}
+     zClassName="z-[60]"
+     className="max-w-md rounded-xl border border-slate-100 p-6 dark:border-slate-800"
+    >
       <div className="flex items-center gap-3 mb-4">
        <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950 flex items-center justify-center shrink-0">
         <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
@@ -465,8 +466,7 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
         Confirmar inativação
        </button>
       </div>
-     </div>
-    </div>
+    </AnimatedDialogFrame>
    )}
   </>
  );

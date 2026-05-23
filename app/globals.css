@@ -1,16 +1,9 @@
 @import "tailwindcss";
 
-@keyframes route-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+:root {
+  --crc-sonner-bottom: 20px;
 }
 
-.route-fade-in {
-  animation: route-fade-in 140ms ease-out;
+[data-sonner-toaster][data-y-position="bottom"][data-x-position="right"] {
+  bottom: var(--crc-sonner-bottom) !important;
 }

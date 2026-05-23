@@ -11,6 +11,7 @@ import { useCrud } from '@/hooks/use-crud'
 import { formatDate, mapTipoDispositivo, mapTipoMovimentacao } from '@/lib/utils'
 import type { Movimentacao } from '@/types'
 import { optionalInt } from '@/lib/zod-helpers'
+import { AnimatedSheetFrame } from '@/components/layout/motion-primitives'
 
 const schema = z.object({
   identificador_dispositivo: z.string().optional().nullable(),
@@ -59,9 +60,7 @@ export function MovimentacaoModal({ movimentacao, onClose, onRefresh }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex">
-        <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <aside className="w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+      <AnimatedSheetFrame onClose={onClose}>
 
           {/* Header */}
           <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
@@ -201,8 +200,7 @@ export function MovimentacaoModal({ movimentacao, onClose, onRefresh }: Props) {
               </>
             )}
           </div>
-        </aside>
-      </div>
+      </AnimatedSheetFrame>
 
       {showDeleteConfirm && (
         <ConfirmDialog

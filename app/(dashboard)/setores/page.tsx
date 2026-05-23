@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/modals/confirm-dialog'
 import { Search, Plus, Pencil, Trash2, Loader2, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 import { BoolBadge } from '@/components/dashboard/status-badge'
+import { AnimatedSheetFrame } from '@/components/layout/motion-primitives'
 
 interface Setor {
   id: string
@@ -206,9 +207,7 @@ export default function SetoresPage() {
 
       {/* Modal de criação/edição */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={() => setShowForm(false)} />
-          <aside className="w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+        <AnimatedSheetFrame onClose={() => setShowForm(false)}>
             <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
               <h2 className="text-base font-semibold text-slate-900 dark:text-white">
                 {editing ? `Editar: ${editing.nome}` : 'Novo Setor'}
@@ -249,8 +248,7 @@ export default function SetoresPage() {
                 {editing ? 'Salvar alterações' : 'Criar setor'}
               </button>
             </div>
-          </aside>
-        </div>
+        </AnimatedSheetFrame>
       )}
 
       {confirmDelete && (

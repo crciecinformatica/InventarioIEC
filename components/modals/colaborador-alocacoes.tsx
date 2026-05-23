@@ -38,7 +38,11 @@ interface AlocacoesData {
 
 interface Props {
   colaboradorId: string
-  onNavigate?: (tipo: 'maquinas' | 'notebooks' | 'aparelhos' | 'ramais', itemId: string) => void
+  onNavigate?: (
+    tipo: 'maquinas' | 'notebooks' | 'aparelhos' | 'ramais',
+    itemId: string,
+    preview?: { title: string; subtitle?: string }
+  ) => void
   interactive?: boolean
   variant?: 'full' | 'summary'
 }
@@ -270,7 +274,7 @@ function AlocacaoCard({
   return (
     <button
       type="button"
-      onClick={() => onNavigate(tipo, aloc.item.id)}
+      onClick={() => onNavigate(tipo, aloc.item.id, { title: label, subtitle: sub || location || undefined })}
       className={className}
     >
       {content}

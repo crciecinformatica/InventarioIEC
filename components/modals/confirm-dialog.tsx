@@ -1,6 +1,7 @@
 'use client'
 
 import { AlertTriangle, Loader2 } from 'lucide-react'
+import { AnimatedDialogFrame } from '@/components/layout/motion-primitives'
 
 interface ConfirmDialogProps {
   title: string
@@ -12,9 +13,8 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({ title, description, onConfirm, onCancel, loading }: ConfirmDialogProps) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-100 dark:border-slate-800">
+    <>
+      <AnimatedDialogFrame onClose={onCancel} zClassName="z-[60]" className="max-w-sm rounded-xl border border-slate-100 p-6 dark:border-slate-800">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950 flex items-center justify-center shrink-0">
             <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
@@ -39,7 +39,7 @@ export function ConfirmDialog({ title, description, onConfirm, onCancel, loading
             Excluir
           </button>
         </div>
-      </div>
-    </div>
+      </AnimatedDialogFrame>
+    </>
   )
 }

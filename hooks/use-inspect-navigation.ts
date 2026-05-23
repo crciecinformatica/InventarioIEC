@@ -1,7 +1,12 @@
 'use client'
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { buildInspectHref, removeInspectHref } from '@/lib/navigation-context'
+import {
+  buildInspectHref,
+  inferInspectPreview,
+  removeInspectHref,
+  writePendingInspectPreview,
+} from '@/lib/navigation-context'
 
 type InspectableItem = {
   id: string
@@ -15,8 +20,10 @@ export function useInspectNavigation<T extends InspectableItem>(
   const searchParams = useSearchParams()
 
   function openInspect(item: T) {
+    const href = buildInspectHref(pathname, searchParams.toString(), item.id)
     setSelected(item)
-    router.push(buildInspectHref(pathname, searchParams.toString(), item.id), { scroll: false })
+    writePendingInspectPreview(window.sessionStorage, href, inferInspectPreview(item as Record<string, unknown>))
+    router.push(href, { scroll: false })
   }
 
   function closeInspect() {

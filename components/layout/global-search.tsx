@@ -7,6 +7,7 @@ import {
   Search, X, Loader2,
   Users, Monitor, Laptop, Smartphone, Printer, Phone, ArrowRight,
 } from 'lucide-react'
+import { writePendingInspectPreview } from '@/lib/navigation-context'
 
 type TipoResult = 'colaborador' | 'maquina' | 'notebook' | 'aparelho' | 'ramal' | 'impressora'
 
@@ -162,6 +163,10 @@ export function GlobalSearch({ className = '' }: Props) {
     setOpen(false)
     setQuery('')
     setResults([])
+    writePendingInspectPreview(window.sessionStorage, result.href, {
+      title: result.label,
+      subtitle: [result.sub, result.meta].filter(Boolean).join(' · '),
+    })
     router.push(result.href)
   }
 
