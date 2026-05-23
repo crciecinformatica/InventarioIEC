@@ -2,6 +2,7 @@
 import { usePermission } from '@/hooks/use-permission'
 
 import { useState, useEffect, useCallback } from 'react'
+import { AnimatePresence } from 'motion/react'
 import { useSearchParams } from 'next/navigation'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/tables/data-table'
@@ -316,8 +317,10 @@ export default function ColaboradoresPage() {
         dir={dir}
         onSort={(field, newDir) => { setSort(field); setDir(newDir); setPage(1) }}
       />
-      {selected && <ColaboradorModal colaborador={selected} onClose={closeInspect} onRefresh={() => setRefreshKey(k => k + 1)}/>}
-      {showCriar && <CriarColaboradorModal onClose={() => setShowCriar(false)} onRefresh={() => setRefreshKey(k => k + 1)} />}
+      <AnimatePresence initial={false}>
+        {selected && <ColaboradorModal key={`colaborador-${selected.id}`} colaborador={selected} onClose={closeInspect} onRefresh={() => setRefreshKey(k => k + 1)}/>}
+        {showCriar && <CriarColaboradorModal key="criar-colaborador" onClose={() => setShowCriar(false)} onRefresh={() => setRefreshKey(k => k + 1)} />}
+      </AnimatePresence>
     </div>
   )
 }

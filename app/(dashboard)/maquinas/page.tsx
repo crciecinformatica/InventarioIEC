@@ -2,6 +2,7 @@
 import { usePermission } from '@/hooks/use-permission'
 
 import { useState, useEffect, useMemo } from 'react'
+import { AnimatePresence } from 'motion/react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/tables/data-table'
 import { DeviceOverviewPanel, type OverviewFilter, notifyOverviewFilter } from '@/components/tables/device-overview-panel'
@@ -425,19 +426,23 @@ export default function MaquinasPage() {
         onSort={(field, newDir) => { setSort(field); setDir(newDir); setPage(1) }}
       />
 
-      {selected && (
-        <MaquinaModal
-          maquina={selected}
-          onClose={closeInspect}
-          onRefresh={refresh}
-        />
-      )}
-      {showCriar && (
-        <CriarMaquinaModal
-          onClose={() => setShowCriar(false)}
-          onRefresh={refresh}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <MaquinaModal
+            key={`maquina-${selected.id}`}
+            maquina={selected}
+            onClose={closeInspect}
+            onRefresh={refresh}
+          />
+        )}
+        {showCriar && (
+          <CriarMaquinaModal
+            key="criar-maquina"
+            onClose={() => setShowCriar(false)}
+            onRefresh={refresh}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

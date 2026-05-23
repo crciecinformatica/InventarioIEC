@@ -2,6 +2,7 @@
 import { usePermission } from '@/hooks/use-permission'
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { AnimatePresence } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/tables/data-table";
@@ -510,20 +511,24 @@ export default function ImpressorasPage() {
         onSort={(field, newDir) => { setSort(field); setDir(newDir); setPage(1) }}
       />
 
-      {selected && (
-        <ImpressoraModal
-          impressora={selected}
-          onClose={closeInspect}
-          onRefresh={() => setRefreshKey((k) => k + 1)}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <ImpressoraModal
+            key={`impressora-${selected.id}`}
+            impressora={selected}
+            onClose={closeInspect}
+            onRefresh={() => setRefreshKey((k) => k + 1)}
+          />
+        )}
 
-      {showCriar && (
-        <CriarImpressoraModal
-          onClose={() => setShowCriar(false)}
-          onRefresh={() => setRefreshKey((k) => k + 1)}
-        />
-      )}
+        {showCriar && (
+          <CriarImpressoraModal
+            key="criar-impressora"
+            onClose={() => setShowCriar(false)}
+            onRefresh={() => setRefreshKey((k) => k + 1)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

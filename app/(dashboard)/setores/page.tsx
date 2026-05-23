@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { AnimatePresence } from 'motion/react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/tables/data-table'
 import { PageHeader } from '@/components/layout/page-header'
@@ -205,9 +206,10 @@ export default function SetoresPage() {
       <DataTable columns={columns} data={data} total={total} page={page}
         totalPages={totalPages} onPageChange={setPage} isLoading={loading} filters={filters} />
 
-      {/* Modal de criação/edição */}
-      {showForm && (
-        <AnimatedSheetFrame onClose={() => setShowForm(false)}>
+      <AnimatePresence initial={false}>
+        {/* Modal de criação/edição */}
+        {showForm && (
+          <AnimatedSheetFrame key={editing ? `editar-setor-${editing.id}` : 'criar-setor'} onClose={() => setShowForm(false)}>
             <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
               <h2 className="text-base font-semibold text-slate-900 dark:text-white">
                 {editing ? `Editar: ${editing.nome}` : 'Novo Setor'}
@@ -248,18 +250,20 @@ export default function SetoresPage() {
                 {editing ? 'Salvar alterações' : 'Criar setor'}
               </button>
             </div>
-        </AnimatedSheetFrame>
-      )}
+          </AnimatedSheetFrame>
+        )}
 
-      {confirmDelete && (
-        <ConfirmDialog
-          title="Desativar setor"
-          description={`Desativar "${confirmDelete.nome}"? Os itens vinculados não serão afetados.`}
-          onConfirm={() => handleDelete(confirmDelete)}
-          onCancel={() => setConfirmDelete(null)}
-          loading={deleting}
-        />
-      )}
+        {confirmDelete && (
+          <ConfirmDialog
+            key={`desativar-setor-${confirmDelete.id}`}
+            title="Desativar setor"
+            description={`Desativar "${confirmDelete.nome}"? Os itens vinculados não serão afetados.`}
+            onConfirm={() => handleDelete(confirmDelete)}
+            onCancel={() => setConfirmDelete(null)}
+            loading={deleting}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import { AnimatePresence } from 'motion/react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/tables/data-table'
 import {
@@ -251,12 +252,15 @@ export default function MovimentacoesPage() {
         filters={filters}
       />
 
-      {selected && (
-        <AuditLogModal
-          log={selected}
-          onClose={closeInspect}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <AuditLogModal
+            key={`audit-${selected.id}`}
+            log={selected}
+            onClose={closeInspect}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

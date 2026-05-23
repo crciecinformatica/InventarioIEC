@@ -3,6 +3,7 @@
 import { usePermission } from "@/hooks/use-permission";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { AnimatePresence } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
 
@@ -800,22 +801,26 @@ export default function NotebooksPage() {
         }}
       />
 
-      {selected && (
-        <NotebookModal
-          notebook={selected}
-          onClose={closeInspect}
-          onRefresh={refresh}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <NotebookModal
+            key={`notebook-${selected.id}`}
+            notebook={selected}
+            onClose={closeInspect}
+            onRefresh={refresh}
+          />
+        )}
 
-      {showCriar && (
-        <CriarNotebookModal
-          onClose={() =>
-            setShowCriar(false)
-          }
-          onRefresh={refresh}
-        />
-      )}
+        {showCriar && (
+          <CriarNotebookModal
+            key="criar-notebook"
+            onClose={() =>
+              setShowCriar(false)
+            }
+            onRefresh={refresh}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

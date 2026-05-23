@@ -46,28 +46,33 @@ export function AnimatedSheetFrame({
   zClassName = 'z-50',
 }: CloseableMotionShellProps) {
   const reduceMotion = useReducedMotion()
-  const sheetInitial = reduceMotion ? { opacity: 0 } : { x: 72, opacity: 0.72 }
+  const sheetInitial = reduceMotion ? { opacity: 0 } : { x: 'calc(100% + 24px)' }
+  const sheetExit = reduceMotion ? { opacity: 0 } : { x: 'calc(100% + 24px)' }
 
   return (
     <motion.div
-      className={cn('fixed inset-0 flex', zClassName)}
+      className={cn('fixed inset-0', zClassName)}
       initial={reduceMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.16, ease }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18, ease }}
     >
       <motion.div
-        className="flex-1 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
         initial={reduceMotion ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         transition={{ duration: 0.18, ease }}
       />
       <motion.aside
-        className={cn('w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden', className)}
+        className={cn('fixed bottom-0 right-0 top-0 w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden', className)}
         data-animated-sheet-frame
         initial={sheetInitial}
         animate={{ x: 0, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 360, damping: 34, mass: 0.9 }}
+        exit={sheetExit}
+        style={{ willChange: 'transform' }}
+        transition={{ type: 'spring', stiffness: 460, damping: 42, mass: 0.9 }}
       >
         {children}
       </motion.aside>
@@ -82,27 +87,31 @@ export function AnimatedDialogFrame({
   zClassName = 'z-50',
 }: CloseableMotionShellProps) {
   const reduceMotion = useReducedMotion()
-  const dialogInitial = reduceMotion ? { opacity: 0 } : { y: 34, scale: 0.96, opacity: 0 }
+  const dialogInitial = reduceMotion ? { opacity: 0 } : { y: 10, scale: 0.9, opacity: 0 }
+  const dialogExit = reduceMotion ? { opacity: 0 } : { y: 8, scale: 0.92, opacity: 0 }
 
   return (
     <motion.div
       className={cn('fixed inset-0 flex items-center justify-center p-4', zClassName)}
       initial={reduceMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.16, ease }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.14, ease }}
     >
       <motion.div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
         initial={reduceMotion ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.18, ease }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.16, ease }}
       />
       <motion.div
         className={cn('relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden', className)}
         initial={dialogInitial}
         animate={{ y: 0, scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 360, damping: 32, mass: 0.9 }}
+        exit={dialogExit}
+        transition={{ type: 'spring', stiffness: 540, damping: 30, mass: 0.75 }}
       >
         {children}
       </motion.div>

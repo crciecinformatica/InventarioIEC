@@ -3,6 +3,7 @@
 import { usePermission } from "@/hooks/use-permission";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { AnimatePresence } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
 
@@ -523,20 +524,24 @@ export default function RacksPage() {
         }}
       />
 
-      {selected && (
-        <RackModal
-          rack={selected}
-          onClose={closeInspect}
-          onRefresh={refresh}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <RackModal
+            key={`rack-${selected.id}`}
+            rack={selected}
+            onClose={closeInspect}
+            onRefresh={refresh}
+          />
+        )}
 
-      {showCriar && (
-        <CriarRackModal
-          onClose={() => setShowCriar(false)}
-          onRefresh={refresh}
-        />
-      )}
+        {showCriar && (
+          <CriarRackModal
+            key="criar-rack"
+            onClose={() => setShowCriar(false)}
+            onRefresh={refresh}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

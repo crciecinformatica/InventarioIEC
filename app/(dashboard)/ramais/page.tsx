@@ -2,6 +2,7 @@
 import { usePermission } from '@/hooks/use-permission'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { AnimatePresence } from 'motion/react'
 import { useSearchParams } from 'next/navigation'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/tables/data-table'
@@ -456,16 +457,19 @@ export default function RamaisPage() {
         onSort={(field, newDir) => { setSort(field); setDir(newDir); setPage(1) }}
       />
 
-      {showCriar && (
-        <CriarRamalModal onClose={() => setShowCriar(false)} onRefresh={refresh} />
-      )}
-      {selected && (
-        <RamalModal
-          ramal={selected}
-          onClose={closeInspect}
-          onRefresh={refresh}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {showCriar && (
+          <CriarRamalModal key="criar-ramal" onClose={() => setShowCriar(false)} onRefresh={refresh} />
+        )}
+        {selected && (
+          <RamalModal
+            key={`ramal-${selected.id}`}
+            ramal={selected}
+            onClose={closeInspect}
+            onRefresh={refresh}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import { usePermission } from "@/hooks/use-permission";
 import { useState, useEffect } from "react";
+import { AnimatePresence } from "motion/react";
 import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/tables/data-table";
 import {
@@ -732,22 +733,26 @@ export default function AparelhosPage() {
         }}
       />
 
-      {selected && (
-        <AparelhoModal
-          aparelho={selected}
-          onClose={closeInspect}
-          onRefresh={refresh}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <AparelhoModal
+            key={`aparelho-${selected.id}`}
+            aparelho={selected}
+            onClose={closeInspect}
+            onRefresh={refresh}
+          />
+        )}
 
-      {showCriar && (
-        <CriarAparelhoModal
-          onClose={() =>
-            setShowCriar(false)
-          }
-          onRefresh={refresh}
-        />
-      )}
+        {showCriar && (
+          <CriarAparelhoModal
+            key="criar-aparelho"
+            onClose={() =>
+              setShowCriar(false)
+            }
+            onRefresh={refresh}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

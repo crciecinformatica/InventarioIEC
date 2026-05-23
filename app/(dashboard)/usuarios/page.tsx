@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { AnimatePresence } from 'motion/react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { type ColumnDef } from '@tanstack/react-table'
@@ -110,20 +111,24 @@ export default function UsuariosPage() {
         isLoading={loading}
       />
 
-      {selected && (
-        <UsuarioModal
-          usuario={selected}
-          onClose={() => setSelected(null)}
-          onRefresh={fetchData}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <UsuarioModal
+            key={`usuario-${selected.id}`}
+            usuario={selected}
+            onClose={() => setSelected(null)}
+            onRefresh={fetchData}
+          />
+        )}
 
-      {showNew && (
-        <UsuarioModal
-          onClose={() => setShowNew(false)}
-          onRefresh={fetchData}
-        />
-      )}
+        {showNew && (
+          <UsuarioModal
+            key="novo-usuario"
+            onClose={() => setShowNew(false)}
+            onRefresh={fetchData}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
