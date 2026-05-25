@@ -16,6 +16,9 @@ model usuarios {
   senha_hash String
   perfil     String?   @default("viewer")
   ativo      Boolean?  @default(true)
+  forum_topicos     forum_topicos[]
+  forum_comentarios forum_comentarios[]
+  forum_reacoes     forum_reacoes[]
   created_at DateTime? @default(now()) @db.Timestamptz(6)
 }
 
@@ -323,6 +326,60 @@ model audit_log {
   @@index([tabela], map: "idx_audit_log_tabela")
   @@index([registro_id], map: "idx_audit_log_registro_id")
   @@index([created_at(sort: Desc)], map: "idx_audit_log_created_at")
+}
+model forum_topicos {
+  id          String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  titulo      String
+  conteudo    String
+  autor_id    String?              @db.Uuid
+  autor_nome  String
+  fixado      Boolean              @default(false)
+  fechado     Boolean              @default(false)
+  views       Int                  @default(0)
+  created_at  DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime?            @default(now()) @db.Timestamptz(6)
+  autor       usuarios?            @relation(fields: [autor_id], references: [id], onDelete: SetNull)
+  comentarios forum_comentarios[]
+  vinculos    forum_vinculos[]
+}
+
+model forum_comentarios {
+  id         String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  topico_id  String           @db.Uuid
+  autor_id   String?          @db.Uuid
+  autor_nome String
+  conteudo   String
+  editado    Boolean          @default(false)
+  created_at DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at DateTime?        @default(now()) @db.Timestamptz(6)
+  topico     forum_topicos    @relation(fields: [topico_id], references: [id], onDelete: Cascade)
+  autor      usuarios?        @relation(fields: [autor_id], references: [id], onDelete: SetNull)
+  vinculos   forum_vinculos[]
+  reacoes    forum_reacoes[]
+}
+
+model forum_vinculos {
+  id            String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  topico_id     String?            @db.Uuid
+  comentario_id String?            @db.Uuid
+  tipo_item     String
+  item_id       String             @db.Uuid
+  item_label    String
+  created_at    DateTime?          @default(now()) @db.Timestamptz(6)
+  topico        forum_topicos?     @relation(fields: [topico_id], references: [id], onDelete: Cascade)
+  comentario    forum_comentarios? @relation(fields: [comentario_id], references: [id], onDelete: Cascade)
+}
+
+model forum_reacoes {
+  id            String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  comentario_id String            @db.Uuid
+  usuario_id    String            @db.Uuid
+  tipo          String
+  created_at    DateTime?         @default(now()) @db.Timestamptz(6)
+  comentario    forum_comentarios @relation(fields: [comentario_id], references: [id], onDelete: Cascade)
+  usuario       usuarios          @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@unique([comentario_id, usuario_id, tipo])
 }
 
 enum categoria_equipamento {
