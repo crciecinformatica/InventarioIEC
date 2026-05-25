@@ -206,6 +206,19 @@ export function InspectContextReturn() {
     }
   }, [floatingPosition.bottom, sideSheetOpen, visible])
 
+  useEffect(() => {
+    if (!open) return
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null
+      if (target && returnRef.current?.contains(target)) return
+      setOpen(false)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown, true)
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true)
+  }, [open])
+
   function handleReturn(context: InspectContext) {
     setOpen(false)
     writePendingInspectPreview(window.sessionStorage, context.href, getInspectPreviewFromContext(context))
