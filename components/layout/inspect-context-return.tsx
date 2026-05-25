@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ChevronUp, History, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
@@ -19,9 +19,14 @@ import {
 import { AnimatedFloat } from '@/components/layout/motion-primitives'
 
 const BASE_BOTTOM_OFFSET = 20
-const SIDE_SHEET_BOTTOM_OFFSET = 96
 const FLOATING_STACK_GAP = 12
 const RETURN_CONTROL_FALLBACK_HEIGHT = 64
+const RETURN_CONTROL_WIDTH = 320
+
+type FloatingStackPosition = {
+  bottom: number
+  right: number
+}
 
 function getBottomRightOccupiedOffset(minBottom: number) {
   if (typeof window === 'undefined') return minBottom
@@ -41,8 +46,40 @@ function getBottomRightOccupiedOffset(minBottom: number) {
   return Math.max(minBottom, window.innerHeight - highestOccupiedTop + FLOATING_STACK_GAP)
 }
 
-function useFloatingStackBottom(minBottom: number) {
-  const [bottomOffset, setBottomOffset] = useState(minBottom)
+function getSideSheetReturnPosition() {
+  if (typeof window === 'undefined') {
+    return { bottom: BASE_BOTTOM_OFFSET, right: BASE_BOTTOM_OFFSET }
+  }
+
+  const sheet = document.querySelector<HTMLElement>('[data-animated-sheet-frame]')
+  const rect = sheet?.getBoundingClientRect()
+  const overlaySpace = rect ? rect.left : 0
+  const enoughOverlaySpace = overlaySpace >= RETURN_CONTROL_WIDTH + (BASE_BOTTOM_OFFSET * 2)
+
+  if (!rect || !enoughOverlaySpace) {
+    return {
+      bottom: getBottomRightOccupiedOffset(BASE_BOTTOM_OFFSET),
+      right: BASE_BOTTOM_OFFSET,
+    }
+  }
+
+  return {
+    bottom: BASE_BOTTOM_OFFSET,
+    right: Math.max(BASE_BOTTOM_OFFSET, window.innerWidth - rect.left + BASE_BOTTOM_OFFSET),
+  }
+}
+
+function getFloatingStackPosition(sideSheetOpen: boolean): FloatingStackPosition {
+  if (sideSheetOpen) return getSideSheetReturnPosition()
+
+  return {
+    bottom: getBottomRightOccupiedOffset(BASE_BOTTOM_OFFSET),
+    right: BASE_BOTTOM_OFFSET,
+  }
+}
+
+function useFloatingStackPosition(sideSheetOpen: boolean) {
+  const [position, setPosition] = useState<FloatingStackPosition>(() => getFloatingStackPosition(sideSheetOpen))
 
   useEffect(() => {
     let frame = 0
@@ -55,20 +92,20 @@ function useFloatingStackBottom(minBottom: number) {
       }
     }
 
-    function readOffset() {
-      setBottomOffset(getBottomRightOccupiedOffset(minBottom))
+    function readPosition() {
+      setPosition(getFloatingStackPosition(sideSheetOpen))
     }
 
     function scheduleRead(delay = 0) {
       if (delay > 0) {
-        const timeout = window.setTimeout(readOffset, delay)
+        const timeout = window.setTimeout(readPosition, delay)
         timeouts.push(timeout)
         return
       }
 
       window.cancelAnimationFrame(frame)
       frame = window.requestAnimationFrame(() => {
-        frame = window.requestAnimationFrame(readOffset)
+        frame = window.requestAnimationFrame(readPosition)
       })
     }
 
@@ -78,6 +115,7 @@ function useFloatingStackBottom(minBottom: number) {
       scheduleRead(80)
       scheduleRead(180)
       scheduleRead(320)
+      scheduleRead(520)
     }
 
     update()
@@ -98,9 +136,9 @@ function useFloatingStackBottom(minBottom: number) {
       observer.disconnect()
       window.removeEventListener('resize', update)
     }
-  }, [minBottom])
+  }, [sideSheetOpen])
 
-  return bottomOffset
+  return position
 }
 
 export function InspectContextReturn() {
@@ -116,8 +154,7 @@ export function InspectContextReturn() {
     searchParams.has('inspect') &&
     (pathname === '/colaboradores' || pathname === '/impressoras' || pathname === '/racks' || pathname === '/movimentacoes')
   )
-  const minBottomOffset = sideSheetOpen ? SIDE_SHEET_BOTTOM_OFFSET : BASE_BOTTOM_OFFSET
-  const bottomOffset = useFloatingStackBottom(minBottomOffset)
+  const floatingPosition = useFloatingStackPosition(sideSheetOpen)
 
   useEffect(() => {
     const href = `${pathname}${searchString ? `?${searchString}` : ''}`
@@ -143,7 +180,7 @@ export function InspectContextReturn() {
   const primary = options[0]
 
   useEffect(() => {
-    if (!visible) {
+    if (!visible || sideSheetOpen) {
       document.documentElement.style.removeProperty('--crc-sonner-bottom')
       return
     }
@@ -152,7 +189,7 @@ export function InspectContextReturn() {
       const height = returnRef.current?.getBoundingClientRect().height || RETURN_CONTROL_FALLBACK_HEIGHT
       document.documentElement.style.setProperty(
         '--crc-sonner-bottom',
-        `${bottomOffset + height + FLOATING_STACK_GAP}px`,
+        `${floatingPosition.bottom + height + FLOATING_STACK_GAP}px`,
       )
     }
 
@@ -167,7 +204,7 @@ export function InspectContextReturn() {
       window.removeEventListener('resize', updateSonnerStackReserve)
       document.documentElement.style.removeProperty('--crc-sonner-bottom')
     }
-  }, [bottomOffset, visible])
+  }, [floatingPosition.bottom, sideSheetOpen, visible])
 
   function handleReturn(context: InspectContext) {
     setOpen(false)
@@ -181,13 +218,18 @@ export function InspectContextReturn() {
     setOpen(false)
   }
 
+  const returnControlStyle: CSSProperties = {
+    bottom: floatingPosition.bottom,
+    right: floatingPosition.right,
+  }
+
   return (
     <AnimatePresence>
       {visible && primary && (
         <AnimatedFloat
-          className="fixed right-5 z-50 w-[min(320px,calc(100vw-2rem))] rounded-full border border-slate-200 bg-white/95 p-1.5 shadow-xl shadow-slate-950/15 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95"
+          className="fixed z-50 w-[min(320px,calc(100vw-2rem))] rounded-full border border-slate-200 bg-white/95 p-1.5 shadow-xl shadow-slate-950/15 backdrop-blur transition-[bottom,right] duration-300 ease-out motion-reduce:transition-none dark:border-slate-700 dark:bg-slate-900/95"
           ref={returnRef}
-          style={{ bottom: bottomOffset }}
+          style={returnControlStyle}
         >
           <AnimatePresence>
             {open && (

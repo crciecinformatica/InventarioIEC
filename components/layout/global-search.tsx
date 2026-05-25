@@ -62,14 +62,11 @@ export function GlobalSearch({ className = '' }: Props) {
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const [pos, setPos] = useState<DropdownPos | null>(null)
-  const [mounted, setMounted] = useState(false)
 
   const wrapperRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => { setMounted(true) }, [])
 
   function calcPos() {
     if (!wrapperRef.current) return
@@ -84,10 +81,12 @@ export function GlobalSearch({ className = '' }: Props) {
   // Debounce da busca
   useEffect(() => {
     if (query.length < 2) {
-      setResults([])
-      setOpen(false)
-      setActiveIndex(-1)
-      return
+      const timeout = window.setTimeout(() => {
+        setResults([])
+        setOpen(false)
+        setActiveIndex(-1)
+      }, 0)
+      return () => window.clearTimeout(timeout)
     }
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
@@ -180,8 +179,9 @@ export function GlobalSearch({ className = '' }: Props) {
 
   const groups = groupResults(results)
   const flatResults = groups.flatMap(g => g.items)
+  const canUseDOM = typeof document !== 'undefined'
 
-  const dropdown = mounted && open && pos ? createPortal(
+  const dropdown = canUseDOM && open && pos ? createPortal(
     <div
       ref={dropdownRef}
       style={{
@@ -197,7 +197,7 @@ export function GlobalSearch({ className = '' }: Props) {
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <Search className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-            Nenhum resultado para "{query}"
+            Nenhum resultado para &quot;{query}&quot;
           </p>
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
             Tente buscar por outro termo
