@@ -3,6 +3,7 @@
 import { usePermission } from "@/hooks/use-permission";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { AnimatePresence } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
 
@@ -20,6 +21,7 @@ import { SetorSelect } from "@/components/modals/setor-select";
 import { LocalidadeSelect } from "@/components/modals/localidade-select";
 
 import { Search, Plus } from "lucide-react";
+import { useInspectNavigation } from "@/hooks/use-inspect-navigation";
 
 import type { Rack, PaginatedResponse } from "@/types";
 
@@ -51,6 +53,8 @@ export default function RacksPage() {
     useState<ActiveOverviewFilter[]>([]);
 
   const [selected, setSelected] = useState<Rack | null>(null);
+  const { openInspect, closeInspect } =
+    useInspectNavigation<Rack>(setSelected);
   const [showCriar, setShowCriar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -506,7 +510,7 @@ export default function RacksPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={
           loading || overviewFilterLoading
         }
@@ -520,20 +524,24 @@ export default function RacksPage() {
         }}
       />
 
-      {selected && (
-        <RackModal
-          rack={selected}
-          onClose={() => setSelected(null)}
-          onRefresh={refresh}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <RackModal
+            key={`rack-${selected.id}`}
+            rack={selected}
+            onClose={closeInspect}
+            onRefresh={refresh}
+          />
+        )}
 
-      {showCriar && (
-        <CriarRackModal
-          onClose={() => setShowCriar(false)}
-          onRefresh={refresh}
-        />
-      )}
+        {showCriar && (
+          <CriarRackModal
+            key="criar-rack"
+            onClose={() => setShowCriar(false)}
+            onRefresh={refresh}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

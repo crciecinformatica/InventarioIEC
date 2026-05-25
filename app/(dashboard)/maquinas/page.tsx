@@ -2,6 +2,7 @@
 import { usePermission } from '@/hooks/use-permission'
 
 import { useState, useEffect, useMemo } from 'react'
+import { AnimatePresence } from 'motion/react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/tables/data-table'
 import { DeviceOverviewPanel, type OverviewFilter, notifyOverviewFilter } from '@/components/tables/device-overview-panel'
@@ -14,6 +15,7 @@ import { LocalidadeSelect } from '@/components/modals/localidade-select'
 import { Search, Plus } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import type { Maquina, PaginatedResponse } from '@/types'
+import { useInspectNavigation } from '@/hooks/use-inspect-navigation'
 
 type ActiveOverviewFilter = OverviewFilter & {
   key: string
@@ -66,6 +68,7 @@ export default function MaquinasPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const searchParams = useSearchParams()
   const inspectId = searchParams.get('inspect')
+  const { openInspect, closeInspect } = useInspectNavigation<Maquina>(setSelected)
   const [activeOverviewFilters, setActiveOverviewFilters] = useState<ActiveOverviewFilter[]>([])
   const [overviewFilterLoading, setOverviewFilterLoading] = useState(false)
 
@@ -415,7 +418,7 @@ export default function MaquinasPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={loading || overviewFilterLoading}
         filters={filters}
         sort={sort}
@@ -423,19 +426,23 @@ export default function MaquinasPage() {
         onSort={(field, newDir) => { setSort(field); setDir(newDir); setPage(1) }}
       />
 
-      {selected && (
-        <MaquinaModal
-          maquina={selected}
-          onClose={() => setSelected(null)}
-          onRefresh={refresh}
-        />
-      )}
-      {showCriar && (
-        <CriarMaquinaModal
-          onClose={() => setShowCriar(false)}
-          onRefresh={refresh}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <MaquinaModal
+            key={`maquina-${selected.id}`}
+            maquina={selected}
+            onClose={closeInspect}
+            onRefresh={refresh}
+          />
+        )}
+        {showCriar && (
+          <CriarMaquinaModal
+            key="criar-maquina"
+            onClose={() => setShowCriar(false)}
+            onRefresh={refresh}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

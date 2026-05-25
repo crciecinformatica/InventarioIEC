@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import { AnimatePresence } from 'motion/react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/tables/data-table'
 import {
@@ -15,6 +16,7 @@ import { Search } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { ACAO_COLORS, ACAO_LABELS, TABELAS_OPCOES, type AuditLog } from '@/lib/audit-constants'
 import { toast } from 'sonner'
+import { useInspectNavigation } from '@/hooks/use-inspect-navigation'
 
 function AcaoBadge({ acao }: { acao: string }) {
   return (
@@ -28,6 +30,7 @@ export default function MovimentacoesPage() {
   const [page, setPage] = useState(1)
   const [refreshKey] = useState(0)
   const [selected, setSelected] = useState<AuditLog | null>(null)
+  const { openInspect, closeInspect } = useInspectNavigation<AuditLog>(setSelected)
   const [tabela, setTabela] = useState('')
   const [acao, setAcao] = useState('')
   const [usuario, setUsuario] = useState('')
@@ -244,17 +247,20 @@ export default function MovimentacoesPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={loading || overviewFilterLoading}
         filters={filters}
       />
 
-      {selected && (
-        <AuditLogModal
-          log={selected}
-          onClose={() => setSelected(null)}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <AuditLogModal
+            key={`audit-${selected.id}`}
+            log={selected}
+            onClose={closeInspect}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

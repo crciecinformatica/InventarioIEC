@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { Sidebar } from '@/components/layout/sidebar'
+import { InspectContextReturn } from '@/components/layout/inspect-context-return'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
@@ -14,6 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main className="flex-1 overflow-y-auto min-w-0 pt-14 lg:pt-0">
         {children}
       </main>
+      <InspectContextReturn />
     </div>
   )
 }

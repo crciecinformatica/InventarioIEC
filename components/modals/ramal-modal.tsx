@@ -14,6 +14,7 @@ import { HistoricoPanel } from "./historico-panel";
 import { AlocacoesAtivasSection } from "@/components/modals/alocacoes-ativas-section";
 import { SetorSelect } from "./setor-select";
 import { LocalidadeSelect } from "./localidade-select";
+import { AnimatedDialogFrame } from "@/components/layout/motion-primitives";
 
 const schema = z.object({
  numero_ramal: z.string().optional().nullable(),
@@ -76,12 +77,7 @@ export function RamalModal({ ramal, onClose, onRefresh }: Props) {
 
  return (
   <>
-   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div
-     className="absolute inset-0 bg-black/45 backdrop-blur-sm"
-     onClick={onClose}
-    />
-    <section className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+   <AnimatedDialogFrame onClose={onClose} className="flex max-h-[90vh] max-w-4xl flex-col rounded-2xl">
      <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
       <div>
        <h2 className="text-base font-semibold text-slate-900 dark:text-white font-mono">
@@ -112,11 +108,12 @@ export function RamalModal({ ramal, onClose, onRefresh }: Props) {
         alocacoes={(ramal.alocacoes_ativas ?? []).map((a) => ({
          id: a.id,
          colaborador: {
-                      nome: a.colaborador.nome,
-                      setor_rel: {
-                        nome: a.colaborador.setor_rel?.nome ?? null,
-                      },
-                    },
+          id: a.colaborador.id,
+          nome: a.colaborador.nome,
+          setor_rel: {
+           nome: a.colaborador.setor_rel?.nome ?? null,
+          },
+         },
          data_inicio: a.data_inicio ?? null,
          whatsapp: a.whatsapp,
         }))}
@@ -290,8 +287,7 @@ export function RamalModal({ ramal, onClose, onRefresh }: Props) {
        </>
       )}
      </div>
-    </section>
-   </div>
+   </AnimatedDialogFrame>
 
    {showDeleteConfirm && (
     <ConfirmDialog

@@ -63,6 +63,7 @@ export async function GET(_: Request, { params }: Props) {
         include: {
           colaborador: {
             select: {
+              id: true,
               nome: true,
               setor_rel: {
                 select: {

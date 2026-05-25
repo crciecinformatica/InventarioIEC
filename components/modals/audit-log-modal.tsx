@@ -3,6 +3,7 @@
 import { X, User, Clock, Database, Tag, FileText, ArrowRight } from 'lucide-react'
 import type { AuditLog } from '@/lib/audit-constants'
 import { ACAO_COLORS, ACAO_LABELS, TABELAS_OPCOES } from '@/lib/audit-constants'
+import { AnimatedSheetFrame } from '@/components/layout/motion-primitives'
 
 interface Props {
   log: AuditLog
@@ -124,9 +125,7 @@ export function AuditLogModal({ log, onClose }: Props) {
   const temNovo = !!log.dados_novos
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <aside className="w-full max-w-lg bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+    <AnimatedSheetFrame onClose={onClose} className="max-w-lg">
 
         {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
@@ -263,7 +262,6 @@ export function AuditLogModal({ log, onClose }: Props) {
             Fechar
           </button>
         </div>
-      </aside>
-    </div>
+    </AnimatedSheetFrame>
   )
 }

@@ -2,6 +2,7 @@
 
 import { usePermission } from "@/hooks/use-permission";
 import { useState, useEffect } from "react";
+import { AnimatePresence } from "motion/react";
 import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/tables/data-table";
 import {
@@ -19,6 +20,7 @@ import { mapTipoAparelho } from "@/lib/utils";
 import type { Aparelho, PaginatedResponse } from "@/types";
 import { CriarAparelhoModal } from "@/components/modals/criar-aparelho-modal";
 import { useSearchParams } from "next/navigation";
+import { useInspectNavigation } from "@/hooks/use-inspect-navigation";
 
 type ActiveOverviewFilter = OverviewFilter & {
   key: string;
@@ -152,6 +154,8 @@ export default function AparelhosPage() {
 
   const [selected, setSelected] =
     useState<Aparelho | null>(null);
+  const { openInspect, closeInspect } =
+    useInspectNavigation<Aparelho>(setSelected);
 
   const [showCriar, setShowCriar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -715,7 +719,7 @@ export default function AparelhosPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={
           loading || overviewFilterLoading
         }
@@ -729,22 +733,26 @@ export default function AparelhosPage() {
         }}
       />
 
-      {selected && (
-        <AparelhoModal
-          aparelho={selected}
-          onClose={() => setSelected(null)}
-          onRefresh={refresh}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <AparelhoModal
+            key={`aparelho-${selected.id}`}
+            aparelho={selected}
+            onClose={closeInspect}
+            onRefresh={refresh}
+          />
+        )}
 
-      {showCriar && (
-        <CriarAparelhoModal
-          onClose={() =>
-            setShowCriar(false)
-          }
-          onRefresh={refresh}
-        />
-      )}
+        {showCriar && (
+          <CriarAparelhoModal
+            key="criar-aparelho"
+            onClose={() =>
+              setShowCriar(false)
+            }
+            onRefresh={refresh}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
