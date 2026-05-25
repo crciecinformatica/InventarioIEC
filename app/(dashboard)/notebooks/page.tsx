@@ -3,6 +3,7 @@
 import { usePermission } from "@/hooks/use-permission";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { AnimatePresence } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
 
@@ -24,6 +25,7 @@ import { LocalidadeSelect } from "@/components/modals/localidade-select";
 import { Search, Plus } from "lucide-react";
 
 import { formatDate } from "@/lib/utils";
+import { useInspectNavigation } from "@/hooks/use-inspect-navigation";
 
 import type { Notebook, PaginatedResponse } from "@/types";
 
@@ -80,6 +82,8 @@ export default function NotebooksPage() {
   const [loading, setLoading] = useState(true);
 
   const [selected, setSelected] = useState<Notebook | null>(null);
+  const { openInspect, closeInspect } =
+    useInspectNavigation<Notebook>(setSelected);
   const [showCriar, setShowCriar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -779,7 +783,7 @@ export default function NotebooksPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={
           loading ||
           overviewFilterLoading
@@ -797,24 +801,26 @@ export default function NotebooksPage() {
         }}
       />
 
-      {selected && (
-        <NotebookModal
-          notebook={selected}
-          onClose={() =>
-            setSelected(null)
-          }
-          onRefresh={refresh}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <NotebookModal
+            key={`notebook-${selected.id}`}
+            notebook={selected}
+            onClose={closeInspect}
+            onRefresh={refresh}
+          />
+        )}
 
-      {showCriar && (
-        <CriarNotebookModal
-          onClose={() =>
-            setShowCriar(false)
-          }
-          onRefresh={refresh}
-        />
-      )}
+        {showCriar && (
+          <CriarNotebookModal
+            key="criar-notebook"
+            onClose={() =>
+              setShowCriar(false)
+            }
+            onRefresh={refresh}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

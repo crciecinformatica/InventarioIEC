@@ -1,3 +1,5 @@
+import { RouteTransition } from '@/components/layout/motion-primitives'
+
 export default function DashboardTemplate({ children }: { children: React.ReactNode }) {
-  return <div className="route-fade-in">{children}</div>
+  return <RouteTransition>{children}</RouteTransition>
 }

@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { useCreate } from '@/hooks/use-create'
 import { SetorSelect } from './setor-select'
 import { LocalidadeSelect } from './localidade-select'
+import { AnimatedSheetFrame } from '@/components/layout/motion-primitives'
 
 const schema = z.object({
   nome_host: z.string().optional().nullable(),
@@ -38,9 +39,7 @@ export function CriarImpressoraModal({ onClose, onRefresh }: Props) {
   const lbl = "block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1"
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <aside className="w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+    <AnimatedSheetFrame onClose={onClose}>
         <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
           <h2 className="text-base font-semibold text-slate-900 dark:text-white">Nova Impressora</h2>
           <button type="button" onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"><X className="w-4 h-4" /></button>
@@ -86,7 +85,6 @@ export function CriarImpressoraModal({ onClose, onRefresh }: Props) {
             Criar impressora
           </button>
         </div>
-      </aside>
-    </div>
+    </AnimatedSheetFrame>
   )
 }

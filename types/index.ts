@@ -19,6 +19,7 @@ export interface DashboardStats {
 export interface AlocacaoAtiva {
   id: string
   colaborador: {
+    id?: string
     nome: string
     setor_rel?: {
       nome: string | null

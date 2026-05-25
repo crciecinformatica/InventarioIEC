@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/modals/confirm-dialog'
 import { formatDate } from '@/lib/utils'
+import { AnimatedSheetFrame } from '@/components/layout/motion-primitives'
 
 const newSchema = z.object({
   nome: z.string().min(2, 'Nome obrigatório'),
@@ -107,9 +108,7 @@ export function UsuarioModal({ usuario, onClose, onRefresh }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex">
-        <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <aside className="w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+      <AnimatedSheetFrame onClose={onClose}>
           <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
@@ -204,8 +203,7 @@ export function UsuarioModal({ usuario, onClose, onRefresh }: Props) {
               {isNew ? 'Criar usuário' : 'Salvar alterações'}
             </button>
           </div>
-        </aside>
-      </div>
+      </AnimatedSheetFrame>
 
       {showConfirm && (
         <ConfirmDialog

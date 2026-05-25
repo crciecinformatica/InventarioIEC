@@ -14,6 +14,7 @@ import { HistoricoPanel } from '@/components/modals/historico-panel'
 import { useCrud } from '@/hooks/use-crud'
 import { optionalInt } from '@/lib/zod-helpers'
 import type { Rack } from '@/types'
+import { AnimatedSheetFrame } from '@/components/layout/motion-primitives'
 
 const schema = z.object({
   nome_switch:             z.string().optional().nullable(),
@@ -74,9 +75,7 @@ export function RackModal({ rack, onClose, onRefresh }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex">
-        <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <aside className="w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+      <AnimatedSheetFrame onClose={onClose}>
 
           {/* Header */}
           <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
@@ -215,8 +214,7 @@ export function RackModal({ rack, onClose, onRefresh }: Props) {
               </>
             )}
           </div>
-        </aside>
-      </div>
+      </AnimatedSheetFrame>
 
       {showDeleteConfirm && (
         <ConfirmDialog

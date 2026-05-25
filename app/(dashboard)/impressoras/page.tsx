@@ -2,6 +2,7 @@
 import { usePermission } from '@/hooks/use-permission'
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { AnimatePresence } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/tables/data-table";
@@ -17,6 +18,7 @@ import { CriarImpressoraModal } from "@/components/modals/criar-impressora-modal
 import { SetorSelect } from "@/components/modals/setor-select";
 import { LocalidadeSelect } from "@/components/modals/localidade-select";
 import { Search, Plus } from "lucide-react";
+import { useInspectNavigation } from "@/hooks/use-inspect-navigation";
 
 import type { Impressora, PaginatedResponse } from "@/types";
 
@@ -70,6 +72,8 @@ export default function ImpressorasPage() {
   const [loading, setLoading] = useState(true);
 
   const [selected, setSelected] = useState<Impressora | null>(null);
+  const { openInspect, closeInspect } =
+    useInspectNavigation<Impressora>(setSelected);
 
   const [search, setSearch] = useState("");
 
@@ -499,7 +503,7 @@ export default function ImpressorasPage() {
         page={page}
         totalPages={tableTotalPages}
         onPageChange={setPage}
-        onRowClick={setSelected}
+        onRowClick={openInspect}
         isLoading={loading || overviewFilterLoading}
         filters={filters}
         sort={sort}
@@ -507,20 +511,24 @@ export default function ImpressorasPage() {
         onSort={(field, newDir) => { setSort(field); setDir(newDir); setPage(1) }}
       />
 
-      {selected && (
-        <ImpressoraModal
-          impressora={selected}
-          onClose={() => setSelected(null)}
-          onRefresh={() => setRefreshKey((k) => k + 1)}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <ImpressoraModal
+            key={`impressora-${selected.id}`}
+            impressora={selected}
+            onClose={closeInspect}
+            onRefresh={() => setRefreshKey((k) => k + 1)}
+          />
+        )}
 
-      {showCriar && (
-        <CriarImpressoraModal
-          onClose={() => setShowCriar(false)}
-          onRefresh={() => setRefreshKey((k) => k + 1)}
-        />
-      )}
+        {showCriar && (
+          <CriarImpressoraModal
+            key="criar-impressora"
+            onClose={() => setShowCriar(false)}
+            onRefresh={() => setRefreshKey((k) => k + 1)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
