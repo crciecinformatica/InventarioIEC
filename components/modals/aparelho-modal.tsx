@@ -141,6 +141,7 @@ export function AparelhoModal({ aparelho, onClose, onRefresh }: Props) {
                   alocacoes={(aparelho.alocacoes_ativas ?? []).map(a => ({
                     id: a.id,
                     colaborador: {
+                      id: a.colaborador.id,
                       nome: a.colaborador.nome,
                       setor_rel: {
                         nome: a.colaborador.setor_rel?.nome ?? null,

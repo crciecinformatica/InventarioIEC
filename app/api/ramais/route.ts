@@ -113,7 +113,7 @@ export async function GET(request: Request) {
         include: {
           alocacoes: {
             where: { ativo: true },
-            include: { colaborador: { select: { nome: true, setor_rel: { select: { nome: true } } } } },
+            include: { colaborador: { select: { id: true, nome: true, setor_rel: { select: { nome: true } } } } },
             orderBy: { data_inicio: 'asc' },
           },
           setor_rel: { select: { id: true, nome: true } },

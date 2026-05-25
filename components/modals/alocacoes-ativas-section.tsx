@@ -2,6 +2,7 @@
 import { usePermission } from '@/hooks/use-permission'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   User,
   UserMinus,
@@ -11,15 +12,17 @@ import {
   CalendarDays,
   Building2,
   MessageCircle,
+  ArrowUpRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ColaboradorSelect } from '@/components/modals/colaborador-select'
 import { ConfirmDialog } from '@/components/modals/confirm-dialog'
 import { formatDate } from '@/lib/utils'
+import { writePendingInspectPreview } from '@/lib/navigation-context'
 
 interface AlocacaoItem {
   id: string
-  colaborador: { nome: string; setor_rel: { nome: string | null } }
+  colaborador: { id?: string; nome: string; setor_rel: { nome: string | null } }
   data_inicio: string | null
   whatsapp?: boolean | null    // apenas ramais
   extra?: React.ReactNode      // slot para campos específicos
@@ -40,6 +43,7 @@ export function AlocacoesAtivasSection({
   onRefresh,
 }: Props) {
   const { isAdmin } = usePermission()
+  const router = useRouter()
   const [novoColabId, setNovoColabId] = useState('')
   const [novoColabNome, setNovoColabNome] = useState('')
   const [savingNova, setSavingNova] = useState(false)
@@ -49,6 +53,18 @@ export function AlocacoesAtivasSection({
   const [novoWhatsapp, setNovoWhatsapp] = useState(false)
   const [savingWhatsapp, setSavingWhatsapp] = useState(false)
   const totalAlocacoes = alocacoes.length
+
+  function abrirColaborador(aloc: AlocacaoItem) {
+    const colaboradorId = aloc.colaborador.id
+    if (!colaboradorId) return
+
+    const href = `/colaboradores?inspect=${colaboradorId}`
+    writePendingInspectPreview(window.sessionStorage, href, {
+      title: aloc.colaborador.nome,
+      subtitle: aloc.colaborador.setor_rel.nome ?? undefined,
+    })
+    router.push(href)
+  }
 
   // Alocar novo colaborador
   async function alocar() {
@@ -145,53 +161,71 @@ export function AlocacoesAtivasSection({
           {alocacoes.map((aloc) => (
             <div
               key={aloc.id}
-              className="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm"
+              className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-emerald-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-900/70"
             >
               <div className="flex">
                 <div className="w-1 bg-emerald-500 shrink-0" />
                 <div className="min-w-0 flex-1 p-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-100 dark:ring-emerald-900/70">
-                        <User className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          {aloc.colaborador.nome}
-                        </p>
-                        <div className="mt-1 flex flex-wrap gap-1.5">
-                          {aloc.colaborador.setor_rel.nome && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 dark:bg-slate-800 px-1.5 py-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                              <Building2 className="h-3 w-3" />
-                              {aloc.colaborador.setor_rel.nome}
-                            </span>
-                          )}
-                          {aloc.data_inicio && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 dark:bg-slate-800 px-1.5 py-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                              <CalendarDays className="h-3 w-3" />
-                              Desde {formatDate(aloc.data_inicio)}
-                            </span>
-                          )}
-                          {entidade === 'ramais' && aloc.whatsapp === true && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 dark:bg-emerald-950 px-1.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-                              <MessageCircle className="h-3 w-3" />
-                              WhatsApp
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {isAdmin && <button
+                    <button
                       type="button"
-                      onClick={() => setConfirmDesalocar(aloc)}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-500 transition hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                      onClick={() => abrirColaborador(aloc)}
+                      disabled={!aloc.colaborador.id}
+                      className="group flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left transition focus:outline-none focus:ring-2 focus:ring-emerald-500/40 disabled:cursor-default"
+                      aria-label={`Abrir colaborador ${aloc.colaborador.nome}`}
                     >
-                      {desalocandoId === aloc.id
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        : <UserMinus className="w-3.5 h-3.5" />
-                      }
-                      Desalocar
-                    </button>}
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 transition group-hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:ring-emerald-900/70 dark:group-hover:bg-emerald-900/60">
+                        <User className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-start gap-2">
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-slate-900 transition group-hover:text-emerald-700 dark:text-slate-100 dark:group-hover:text-emerald-300">
+                              {aloc.colaborador.nome}
+                            </span>
+                            <span className="mt-1 flex flex-wrap gap-1.5">
+                              {aloc.colaborador.setor_rel.nome && (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-1.5 py-1 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                  <Building2 className="h-3 w-3" />
+                                  {aloc.colaborador.setor_rel.nome}
+                                </span>
+                              )}
+                              {aloc.data_inicio && (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-1.5 py-1 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                  <CalendarDays className="h-3 w-3" />
+                                  Desde {formatDate(aloc.data_inicio)}
+                                </span>
+                              )}
+                              {entidade === 'ramais' && aloc.whatsapp === true && (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                  <MessageCircle className="h-3 w-3" />
+                                  WhatsApp
+                                </span>
+                              )}
+                            </span>
+                          </span>
+                          {aloc.colaborador.id && (
+                            <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 transition group-hover:text-emerald-500" />
+                          )}
+                        </span>
+                        <span className="mt-2 block text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                          Abrir informações do colaborador
+                        </span>
+                      </span>
+                    </button>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDesalocar(aloc)}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-500 transition hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                      >
+                        {desalocandoId === aloc.id
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <UserMinus className="w-3.5 h-3.5" />
+                        }
+                        Desalocar
+                      </button>
+                    )}
                   </div>
 
                   {aloc.extra && (

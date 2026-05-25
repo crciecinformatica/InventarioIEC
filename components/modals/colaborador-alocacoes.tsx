@@ -12,6 +12,8 @@ import {
   MapPin,
   MessageCircle,
   PackageOpen,
+  Wifi,
+  ListTree,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { AdicionarAlocacaoForm } from '@/components/modals/adicionar-alocacao-form'
@@ -22,7 +24,7 @@ type AlocacaoItemData = {
 
 interface AlocacaoItem {
   alocacao_id: string
-  data_inicio: string | null
+  data_inicio: string | Date | null
   item: AlocacaoItemData
   tipo_uso?: number | null
   motivo_alocacao?: string | null
@@ -107,24 +109,29 @@ function getItemLabel(tipo: keyof typeof TIPO_CONFIG, item: AlocacaoItemData): s
   }
 }
 
+function getStringField(item: AlocacaoItemData, key: string) {
+  const value = item[key]
+  return value == null ? '' : String(value)
+}
+
 function getItemSub(tipo: keyof typeof TIPO_CONFIG, item: AlocacaoItemData): string {
-  const setor = String((item as any).setor_nome ?? '')
+  const setor = getStringField(item, 'setor_nome')
   switch (tipo) {
     case 'maquinas':
       return [item.fabricante, item.modelo].filter(Boolean).map(String).join(' ') || setor
     case 'notebooks':
       return [item.fabricante, item.modelo].filter(Boolean).map(String).join(' ') || ''
     case 'aparelhos':
-      return setor
+      return ''
     case 'ramais':
-      return setor
+      return ''
   }
 }
 
 function getItemCode(tipo: keyof typeof TIPO_CONFIG, item: AlocacaoItemData): string {
   switch (tipo) {
     case 'maquinas':
-      return String(item.identificador ?? item.patrimonio_cpu ?? '')
+      return String(item.patrimonio_cpu ?? '')
     case 'notebooks':
       return String(item.numero_patrimonio ?? '')
     case 'aparelhos':
@@ -139,9 +146,9 @@ function getItemLocation(tipo: keyof typeof TIPO_CONFIG, item: AlocacaoItemData)
     case 'maquinas':
     case 'notebooks':
     case 'aparelhos':
-      return String((item as any).setor_nome ?? item.localizacao ?? '')
+      return getStringField(item, 'setor_nome') || getStringField(item, 'localidade_nome')
     case 'ramais':
-      return String((item as any).setor_nome ?? item.disponibilidade ?? '')
+      return getStringField(item, 'setor_nome') || String(item.disponibilidade ?? '')
   }
 }
 
@@ -244,12 +251,24 @@ function AlocacaoCard({
                 {code && <MetadataBadge icon={Hash}>{code}</MetadataBadge>}
                 {location && <MetadataBadge icon={MapPin}>{location}</MetadataBadge>}
                 {category && <MetadataBadge icon={Monitor}>{category}</MetadataBadge>}
+                {tipo === 'aparelhos' && aloc.item.chip === true && (
+                  <MetadataBadge icon={Smartphone}>Chip</MetadataBadge>
+                )}
+                {tipo === 'aparelhos' && aloc.item.endereco_mac && (
+                  <MetadataBadge icon={Wifi}>MAC {String(aloc.item.endereco_mac)}</MetadataBadge>
+                )}
+                {tipo === 'ramais' && aloc.item.disponibilidade && (
+                  <MetadataBadge icon={Phone}>{String(aloc.item.disponibilidade)}</MetadataBadge>
+                )}
+                {tipo === 'ramais' && aloc.item.fila === true && (
+                  <MetadataBadge icon={ListTree}>Fila</MetadataBadge>
+                )}
                 {tipo === 'ramais' && aloc.whatsapp && (
                   <MetadataBadge icon={MessageCircle}>WhatsApp</MetadataBadge>
                 )}
               </div>
 
-              {tipo === 'notebooks' && aloc.motivo_alocacao && (
+              {(tipo === 'notebooks' || tipo === 'aparelhos') && aloc.motivo_alocacao && (
                 <p className="mt-2 rounded-md bg-white/60 dark:bg-slate-900/50 px-2 py-1 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">
                   {aloc.motivo_alocacao}
                 </p>
@@ -305,22 +324,6 @@ function LoadingSkeleton() {
           </div>
         </div>
       ))}
-    </div>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 px-5 py-8 text-center">
-      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-white dark:bg-slate-900 shadow-sm ring-1 ring-slate-200 dark:ring-slate-800">
-        <PackageOpen className="h-5 w-5 text-slate-400" />
-      </div>
-      <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-        Nenhum dispositivo alocado
-      </p>
-      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-        As alocações ativas deste colaborador aparecerão aqui.
-      </p>
     </div>
   )
 }

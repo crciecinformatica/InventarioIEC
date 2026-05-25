@@ -229,11 +229,12 @@ export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
          alocacoes={(notebook.alocacoes_ativas ?? []).map((a) => ({
           id: a.id,
           colaborador: {
-                      nome: a.colaborador.nome,
-                      setor_rel: {
-                        nome: a.colaborador.setor_rel?.nome ?? null,
-                      },
-                    },
+           id: a.colaborador.id,
+           nome: a.colaborador.nome,
+           setor_rel: {
+            nome: a.colaborador.setor_rel?.nome ?? null,
+           },
+          },
           data_inicio: a.data_inicio ?? null,
          }))}
          onRefresh={onRefresh}
