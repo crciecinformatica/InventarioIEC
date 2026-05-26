@@ -2,7 +2,7 @@ CREATE TABLE forum_topicos (
   id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   titulo     TEXT NOT NULL,
   conteudo   TEXT NOT NULL,
-  autor_id   UUID REFERENCES usuarios(id) ON DELETE SET NULL,
+  autor_id   UUID REFERENCES usuarios(id) ON DELETE SET NULL ON UPDATE CASCADE,
   autor_nome TEXT NOT NULL,
   fixado     BOOLEAN NOT NULL DEFAULT FALSE,
   fechado    BOOLEAN NOT NULL DEFAULT FALSE,
@@ -13,8 +13,8 @@ CREATE TABLE forum_topicos (
 
 CREATE TABLE forum_comentarios (
   id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  topico_id  UUID NOT NULL REFERENCES forum_topicos(id) ON DELETE CASCADE,
-  autor_id   UUID REFERENCES usuarios(id) ON DELETE SET NULL,
+  topico_id  UUID NOT NULL REFERENCES forum_topicos(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  autor_id   UUID REFERENCES usuarios(id) ON DELETE SET NULL ON UPDATE CASCADE,
   autor_nome TEXT NOT NULL,
   conteudo   TEXT NOT NULL,
   editado    BOOLEAN NOT NULL DEFAULT FALSE,
@@ -24,8 +24,8 @@ CREATE TABLE forum_comentarios (
 
 CREATE TABLE forum_vinculos (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  topico_id     UUID REFERENCES forum_topicos(id) ON DELETE CASCADE,
-  comentario_id UUID REFERENCES forum_comentarios(id) ON DELETE CASCADE,
+  topico_id     UUID REFERENCES forum_topicos(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  comentario_id UUID REFERENCES forum_comentarios(id) ON DELETE CASCADE ON UPDATE CASCADE,
   tipo_item     TEXT NOT NULL,
   item_id       UUID NOT NULL,
   item_label    TEXT NOT NULL,
@@ -37,8 +37,8 @@ CREATE TABLE forum_vinculos (
 
 CREATE TABLE forum_reacoes (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  comentario_id UUID NOT NULL REFERENCES forum_comentarios(id) ON DELETE CASCADE,
-  usuario_id    UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  comentario_id UUID NOT NULL REFERENCES forum_comentarios(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  usuario_id    UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE ON UPDATE CASCADE,
   tipo          TEXT NOT NULL,
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (comentario_id, usuario_id, tipo)
