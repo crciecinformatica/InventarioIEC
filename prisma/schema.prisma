@@ -1,30 +1,33 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
   extensions = [uuid_ossp(map: "uuid-ossp")]
 }
 
 model usuarios {
-  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  nome       String
-  email      String    @unique
-  senha_hash String
-  perfil     String?   @default("viewer")
-  ativo      Boolean?  @default(true)
-  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  id                String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nome              String
+  email             String              @unique
+  senha_hash        String
+  perfil            String?             @default("viewer")
+  ativo             Boolean?            @default(true)
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  forum_comentarios forum_comentarios[]
+  forum_reacoes     forum_reacoes[]
+  forum_topicos     forum_topicos[]
 }
 
 model setores {
   id                    String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   nome                  String          @unique
-  descricao             String?
-  ativo                 Boolean         @default(true)
   created_at            DateTime?       @default(now()) @db.Timestamptz(6)
+  ativo                 Boolean         @default(true)
+  descricao             String?
   aparelhos             aparelhos[]
   colaboradores         colaboradores[]
   impressoras           impressoras[]
@@ -61,13 +64,13 @@ model colaboradores {
   nome                  String
   status                status_colaborador    @default(Ativo)
   created_at            DateTime?             @default(now()) @db.Timestamptz(6)
-  setor_id              String?               @db.Uuid
   localidade_id         String?               @db.Uuid
+  setor_id              String?               @db.Uuid
   alocacoes_aparelhos   alocacoes_aparelhos[]
   alocacoes_maquinas    alocacoes_maquinas[]
   alocacoes_notebooks   alocacoes_notebooks[]
   alocacoes_ramais      alocacoes_ramais[]
-  localidade_rel        localidades?          @relation(fields: [localidade_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  localidade_rel        localidades?          @relation(fields: [localidade_id], references: [id], onUpdate: NoAction)
   setor_rel             setores?              @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
   movimentacoes         movimentacoes[]
   notebooks_emprestados notebooks[]           @relation("EmprestimoColaborador")
@@ -93,10 +96,10 @@ model maquinas {
   patrimonio_monitor String?
   data_revisao       DateTime?              @db.Date
   created_at         DateTime?              @default(now()) @db.Timestamptz(6)
-  setor_id           String?                @db.Uuid
   localidade_id      String?                @db.Uuid
+  setor_id           String?                @db.Uuid
   alocacoes          alocacoes_maquinas[]
-  localidade_rel     localidades?           @relation(fields: [localidade_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  localidade_rel     localidades?           @relation(fields: [localidade_id], references: [id], onUpdate: NoAction)
   setor_rel          setores?               @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
 
   @@index([identificador], map: "idx_maquinas_identificador")
@@ -112,19 +115,19 @@ model notebooks {
   memoria                   String?
   armazenamento             String?
   numero_patrimonio         String?
-  data_revisao              DateTime?              @db.Date
   created_at                DateTime?              @default(now()) @db.Timestamptz(6)
-  setor_id                  String?                @db.Uuid
   localidade_id             String?                @db.Uuid
+  data_revisao              DateTime?              @db.Date
   emprestado                Boolean                @default(false)
-  emprestado_setor_id       String?                @db.Uuid
   emprestado_colaborador_id String?                @db.Uuid
   emprestado_desde          DateTime?              @db.Date
   emprestado_obs            String?
+  emprestado_setor_id       String?                @db.Uuid
+  setor_id                  String?                @db.Uuid
   alocacoes                 alocacoes_notebooks[]
   emprestado_colaborador    colaboradores?         @relation("EmprestimoColaborador", fields: [emprestado_colaborador_id], references: [id], onUpdate: NoAction)
   emprestado_setor          setores?               @relation("EmprestimoSetor", fields: [emprestado_setor_id], references: [id], onUpdate: NoAction)
-  localidade_rel            localidades?           @relation(fields: [localidade_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  localidade_rel            localidades?           @relation(fields: [localidade_id], references: [id], onUpdate: NoAction)
   setor_rel                 setores?               @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
 
   @@index([emprestado_colaborador_id], map: "idx_notebooks_emprestado_colab")
@@ -140,10 +143,10 @@ model aparelhos {
   endereco_mac   String?
   status         Boolean?              @default(true)
   created_at     DateTime?             @default(now()) @db.Timestamptz(6)
-  setor_id       String?               @db.Uuid
   localidade_id  String?               @db.Uuid
+  setor_id       String?               @db.Uuid
   alocacoes      alocacoes_aparelhos[]
-  localidade_rel localidades?          @relation(fields: [localidade_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  localidade_rel localidades?          @relation(fields: [localidade_id], references: [id], onUpdate: NoAction)
   setor_rel      setores?              @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
 
   @@index([localidade_id], map: "idx_aparelhos_localidade_id")
@@ -164,9 +167,9 @@ model impressoras {
   revisao            DateTime?    @db.Timestamptz(6)
   status             Boolean?     @default(true)
   created_at         DateTime?    @default(now()) @db.Timestamptz(6)
-  setor_id           String?      @db.Uuid
   localidade_id      String?      @db.Uuid
-  localidade_rel     localidades? @relation(fields: [localidade_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  setor_id           String?      @db.Uuid
+  localidade_rel     localidades? @relation(fields: [localidade_id], references: [id], onUpdate: NoAction)
   setor_rel          setores?     @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
 
   @@index([localidade_id], map: "idx_impressoras_localidade_id")
@@ -182,11 +185,11 @@ model ramais {
   status_contemplacao Int?
   senha_acesso        String?
   created_at          DateTime?          @default(now()) @db.Timestamptz(6)
-  setor_id            String?            @db.Uuid
   localidade_id       String?            @db.Uuid
   password            String?
+  setor_id            String?            @db.Uuid
   alocacoes           alocacoes_ramais[]
-  localidade_rel      localidades?       @relation(fields: [localidade_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  localidade_rel      localidades?       @relation(fields: [localidade_id], references: [id], onUpdate: NoAction)
   setor_rel           setores?           @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
 
   @@index([localidade_id], map: "idx_ramais_localidade_id")
@@ -204,9 +207,9 @@ model racks {
   portas_academicas       String?
   portas_vlan_impressoras String?
   created_at              DateTime?    @default(now()) @db.Timestamptz(6)
-  setor_id                String?      @db.Uuid
   localidade_id           String?      @db.Uuid
-  localidade_rel          localidades? @relation(fields: [localidade_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  setor_id                String?      @db.Uuid
+  localidade_rel          localidades? @relation(fields: [localidade_id], references: [id], onUpdate: NoAction)
   setor_rel               setores?     @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
 
   @@index([localidade_id], map: "idx_racks_localidade_id")
@@ -323,6 +326,61 @@ model audit_log {
   @@index([tabela], map: "idx_audit_log_tabela")
   @@index([registro_id], map: "idx_audit_log_registro_id")
   @@index([created_at(sort: Desc)], map: "idx_audit_log_created_at")
+}
+
+model forum_topicos {
+  id          String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  titulo      String
+  conteudo    String
+  autor_id    String?             @db.Uuid
+  autor_nome  String
+  fixado      Boolean             @default(false)
+  fechado     Boolean             @default(false)
+  views       Int                 @default(0)
+  created_at  DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime?           @default(now()) @db.Timestamptz(6)
+  comentarios forum_comentarios[]
+  autor       usuarios?           @relation(fields: [autor_id], references: [id])
+  vinculos    forum_vinculos[]
+}
+
+model forum_comentarios {
+  id         String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  topico_id  String           @db.Uuid
+  autor_id   String?          @db.Uuid
+  autor_nome String
+  conteudo   String
+  editado    Boolean          @default(false)
+  created_at DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at DateTime?        @default(now()) @db.Timestamptz(6)
+  autor      usuarios?        @relation(fields: [autor_id], references: [id])
+  topico     forum_topicos    @relation(fields: [topico_id], references: [id], onDelete: Cascade)
+  reacoes    forum_reacoes[]
+  vinculos   forum_vinculos[]
+}
+
+model forum_vinculos {
+  id            String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  topico_id     String?            @db.Uuid
+  comentario_id String?            @db.Uuid
+  tipo_item     String
+  item_id       String             @db.Uuid
+  item_label    String
+  created_at    DateTime?          @default(now()) @db.Timestamptz(6)
+  comentario    forum_comentarios? @relation(fields: [comentario_id], references: [id], onDelete: Cascade)
+  topico        forum_topicos?     @relation(fields: [topico_id], references: [id], onDelete: Cascade)
+}
+
+model forum_reacoes {
+  id            String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  comentario_id String            @db.Uuid
+  usuario_id    String            @db.Uuid
+  tipo          String
+  created_at    DateTime?         @default(now()) @db.Timestamptz(6)
+  comentario    forum_comentarios @relation(fields: [comentario_id], references: [id], onDelete: Cascade)
+  usuario       usuarios          @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@unique([comentario_id, usuario_id, tipo])
 }
 
 enum categoria_equipamento {

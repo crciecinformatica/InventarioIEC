@@ -8,7 +8,8 @@ import {
   LayoutDashboard, Users, Monitor, Laptop, Smartphone, Printer,
   Phone, Server, ScrollText, ChevronLeft,
   PanelLeftOpen, LogOut, Sun, Moon, Menu, X, UserCog, Loader2,
-  ChevronDown
+  ChevronDown,
+  MessageSquare
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
@@ -52,6 +53,7 @@ const navGroups: NavGroup[] = [
     icon: ScrollText,
     items: [
       { href: '/movimentacoes', label: 'Auditoria', icon: ScrollText },
+      { href: '/forum', label: 'Fórum', icon: ScrollText },
     ],
   },
   {
