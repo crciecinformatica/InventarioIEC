@@ -61,6 +61,21 @@ export async function PATCH(request: Request, { params }: Props) {
     data.updated_at = new Date()
 
     const updated = await prisma.forum_topicos.update({ where: { id }, data })
+    
+    if (Array.isArray(body.vinculos)) {
+      await prisma.forum_vinculos.deleteMany({ where: { topico_id: id } })
+      if (body.vinculos.length > 0) {
+        await prisma.forum_vinculos.createMany({
+          data: body.vinculos.map((v: any) => ({
+            topico_id:  id,
+            tipo_item:  v.tipo_item,
+            item_id:    v.item_id,
+            item_label: v.item_label,
+          })),
+        })
+      }
+    }
+
     return NextResponse.json(updated)
   } catch (err) {
     console.error('[PATCH /api/forum/[id]]', err)

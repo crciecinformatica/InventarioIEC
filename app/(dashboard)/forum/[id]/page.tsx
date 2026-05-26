@@ -36,6 +36,11 @@ export default function TopicoPage() {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [editConteudo, setEditConteudo] = useState('')
 
+  const [editandoTopico, setEditandoTopico] = useState(false)
+  const [editTitulo, setEditTitulo]         = useState('')
+  const [editVinculos, setEditVinculos]     = useState<any[]>([])
+  const [savingTopico, setSavingTopico]     = useState(false)
+
   function load() {
     setLoading(true)
     fetch(`/api/forum/${id}`)
@@ -101,6 +106,25 @@ export default function TopicoPage() {
     })
     load()
   }
+
+  async function salvarTopico() {
+  setSavingTopico(true)
+  try {
+    const res = await fetch(`/api/forum/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ titulo: editTitulo, conteudo: editConteudo, vinculos: editVinculos }),
+    })
+    if (!res.ok) throw new Error()
+
+    // Atualizar vínculos: deletar todos e recriar
+    // (adicionar endpoint de vínculos ou tratar no PATCH)
+    toast.success('Tópico atualizado!')
+    setEditandoTopico(false)
+    load()
+  } catch { toast.error('Erro ao salvar.') }
+  finally { setSavingTopico(false) }
+}
 
   async function deletarTopico() {
     setDeleting(true)
@@ -193,20 +217,61 @@ export default function TopicoPage() {
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
+              {(topico.autor_id === userId || perfil === 'admin') && !editandoTopico && (
+                <button type="button"
+                  onClick={() => {
+                    setEditTitulo(topico.titulo)
+                    setEditConteudo(topico.conteudo)
+                    setEditVinculos(topico.vinculos ?? [])
+                    setEditandoTopico(true)
+                  }}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 transition"
+                  title="Editar tópico">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           )}
         </div>
-        <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed mb-3">
-          {topico.conteudo}
-        </p>
-        <VinculosSection vinculos={topico.vinculos ?? []} />
-
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-50 dark:border-slate-800 text-xs text-slate-400">
-          <span>{topico.autor_nome}</span>
-          <span>{formatDate(topico.created_at)}</span>
-          <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" />{topico.views}</span>
-          <span className="flex items-center gap-1"><MessageSquare className="w-3.5 h-3.5" />{topico.comentarios?.length ?? 0}</span>
-        </div>
+        {editandoTopico ? (
+  <div className="space-y-3 mb-3">
+    <input
+      value={editTitulo}
+      onChange={e => setEditTitulo(e.target.value)}
+      className={inp}
+      placeholder="Título"
+    />
+    <textarea
+      value={editConteudo}
+      onChange={e => setEditConteudo(e.target.value)}
+      rows={6}
+      className={inp}
+      placeholder="Conteúdo"
+    />
+    <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/40">
+      <ItemVincularSelect vinculos={editVinculos} onChange={setEditVinculos} />
+    </div>
+    <div className="flex gap-2">
+      <button type="button" onClick={salvarTopico} disabled={savingTopico}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 transition">
+        {savingTopico ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+        Salvar
+      </button>
+      <button type="button" onClick={() => setEditandoTopico(false)}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+        <X className="w-3 h-3" /> Cancelar
+      </button>
+    </div>
+  </div>
+) : (
+  <>
+    <h1 className="text-lg font-bold text-slate-900 dark:text-white">{topico.titulo}</h1>
+    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed mb-3 mt-2">
+      {topico.conteudo}
+    </p>
+    <VinculosSection vinculos={topico.vinculos ?? []} />
+  </>
+)}
       </div>
 
       {/* Comentários */}
