@@ -43,12 +43,3 @@ CREATE TABLE forum_reacoes (
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (comentario_id, usuario_id, tipo)
 );
-
-CREATE INDEX idx_forum_topicos_created      ON forum_topicos(created_at DESC);
-CREATE INDEX idx_forum_topicos_fixado       ON forum_topicos(fixado) WHERE fixado = TRUE;
-CREATE INDEX idx_forum_topicos_autor        ON forum_topicos(autor_id);
-CREATE INDEX idx_forum_comentarios_topico   ON forum_comentarios(topico_id);
-CREATE INDEX idx_forum_comentarios_autor    ON forum_comentarios(autor_id);
-CREATE INDEX idx_forum_vinculos_item        ON forum_vinculos(tipo_item, item_id);
-CREATE INDEX idx_forum_reacoes_comentario   ON forum_reacoes(comentario_id);
-CREATE INDEX idx_forum_reacoes_usuario      ON forum_reacoes(usuario_id);
