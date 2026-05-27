@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     const userId   = (session.user as any).id as string
     const userName = session.user?.name ?? 'Usuário'
-    const { titulo, conteudo, vinculos = [] } = await request.json()
+    const { titulo, conteudo, vinculos = [], arquivo_ids = [] } = await request.json()
 
     if (!titulo?.trim()) return NextResponse.json({ error: 'Título obrigatório' }, { status: 400 })
     if (!conteudo?.trim()) return NextResponse.json({ error: 'Conteúdo obrigatório' }, { status: 400 })
@@ -78,9 +78,28 @@ export async function POST(request: Request) {
       },
       include: {
         vinculos: true,
+        arquivos: true,
         _count: { select: { comentarios: true } },
       },
     })
+
+    // Associar arquivos ao tópico se houver
+    if (arquivo_ids.length > 0) {
+      await prisma.forum_arquivos.updateMany({
+        where: { id: { in: arquivo_ids } },
+        data: { topico_id: topico.id },
+      })
+      // Recarregar com arquivos
+      const topicoComArquivos = await prisma.forum_topicos.findUnique({
+        where: { id: topico.id },
+        include: {
+          vinculos: true,
+          arquivos: true,
+          _count: { select: { comentarios: true } },
+        },
+      })
+      return NextResponse.json(topicoComArquivos, { status: 201 })
+    }
 
     return NextResponse.json(topico, { status: 201 })
   } catch (err) {

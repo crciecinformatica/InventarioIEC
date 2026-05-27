@@ -14,7 +14,9 @@ export async function POST(request: Request, { params }: Props) {
     const { id: topico_id } = await params
     const userId   = (session.user as any).id as string
     const userName = session.user?.name ?? 'Usuário'
-    const { conteudo, vinculos = [] } = await request.json()
+    
+    // CORREÇÃO: Extrair todos os campos em uma única chamada
+    const { conteudo, vinculos = [], arquivo_ids = [] } = await request.json()
 
     if (!conteudo?.trim()) return NextResponse.json({ error: 'Conteúdo obrigatório' }, { status: 400 })
 
@@ -41,6 +43,14 @@ export async function POST(request: Request, { params }: Props) {
         reacoes:  { select: { usuario_id: true, tipo: true } },
       },
     })
+
+    // NOVA LÓGICA: Vincula as imagens ao ID do comentário recém-criado
+    if (Array.isArray(arquivo_ids) && arquivo_ids.length > 0) {
+      await prisma.forum_arquivos.updateMany({
+        where: { id: { in: arquivo_ids } },
+        data: { comentario_id: comentario.id },
+      })
+    }
 
     return NextResponse.json(comentario, { status: 201 })
   } catch (err) {

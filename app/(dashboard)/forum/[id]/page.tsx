@@ -6,6 +6,8 @@ import { useSession } from 'next-auth/react'
 import { VinculosSection } from '@/components/forum/vinculos-section'
 import { ItemVincularSelect } from '@/components/forum/item-vincular-select'
 import { ReacaoButton } from '@/components/forum/reacao-button'
+import { FileUploadButton } from '@/components/forum/file-upload-button'
+import { ForumFileEmbed } from '@/components/forum/forum-file-embed'
 import { AlertTriangle } from 'lucide-react'
 import { AnimatedDialogFrame } from '@/components/layout/motion-primitives'
 import {
@@ -14,6 +16,14 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
+
+interface UploadedFile {
+  id: string
+  nome_original: string
+  tipo_arquivo: string
+  tamanho_bytes: number
+  url_publica: string
+}
 
 export default function TopicoPage() {
   const { id } = useParams<{ id: string }>()
@@ -30,16 +40,40 @@ export default function TopicoPage() {
   // Novo comentário
   const [novoConteudo, setNovoConteudo] = useState('')
   const [novoVinculos, setNovoVinculos] = useState<any[]>([])
+  const [novoArquivos, setNovoArquivos] = useState<UploadedFile[]>([])
   const [savingComentario, setSavingComentario] = useState(false)
+  const [showUploadNovoComentario, setShowUploadNovoComentario] = useState(false)
+  const tempComentarioId = 'temp-c-' + Math.random().toString(36).substr(2, 9)
 
-  // Edição inline
+  // Edição inline de comentários
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [editConteudo, setEditConteudo] = useState('')
 
+  // Edição do Tópico
   const [editandoTopico, setEditandoTopico] = useState(false)
   const [editTitulo, setEditTitulo]         = useState('')
+  const [editConteudoTopico, setEditConteudoTopico] = useState('')
   const [editVinculos, setEditVinculos]     = useState<any[]>([])
+  const [editArquivos, setEditArquivos]     = useState<UploadedFile[]>([])
+  const [showUploadEditTopico, setShowUploadEditTopico] = useState(false)
   const [savingTopico, setSavingTopico]     = useState(false)
+  const [editComentarioArquivos, setEditComentarioArquivos] = useState<UploadedFile[]>([])
+  const [showUploadEditComentario, setShowUploadEditComentario] = useState(false)
+
+  // Handlers para upload na edição do comentário
+  function handleFileUploadEditComentario(file: UploadedFile) {
+    setEditComentarioArquivos(prev => [...prev, file])
+  }
+
+  async function deleteFileEditComentario(fileId: string) {
+    try {
+      const res = await fetch(`/api/forum/arquivos/${fileId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      setEditComentarioArquivos(prev => prev.filter(f => f.id !== fileId))
+    } catch (error) {
+      toast.error('Erro ao deletar arquivo.')
+    }
+  }
 
   function load() {
     setLoading(true)
@@ -59,6 +93,38 @@ export default function TopicoPage() {
 
   useEffect(() => { load() }, [id])
 
+  // Handlers para Upload de arquivos no Novo Comentário
+  function handleFileUploadNovoComentario(file: UploadedFile) {
+    setNovoArquivos(prev => [...prev, file])
+  }
+
+  async function deleteFileNovoComentario(fileId: string) {
+    try {
+      const res = await fetch(`/api/forum/arquivos/${fileId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      setNovoArquivos(prev => prev.filter(f => f.id !== fileId))
+    } catch (error) {
+      console.error('Delete error:', error)
+      throw error
+    }
+  }
+
+  // Handlers para Upload de arquivos na Edição do Tópico
+  function handleFileUploadEditTopico(file: UploadedFile) {
+    setEditArquivos(prev => [...prev, file])
+  }
+
+  async function deleteFileEditTopico(fileId: string) {
+    try {
+      const res = await fetch(`/api/forum/arquivos/${fileId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      setEditArquivos(prev => prev.filter(f => f.id !== fileId))
+    } catch (error) {
+      console.error('Delete error:', error)
+      throw error
+    }
+  }
+
   async function submitComentario(e: React.FormEvent) {
     e.preventDefault()
     if (!novoConteudo.trim()) return
@@ -67,12 +133,18 @@ export default function TopicoPage() {
       const res = await fetch(`/api/forum/${id}/comentarios`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conteudo: novoConteudo, vinculos: novoVinculos }),
+        body: JSON.stringify({ 
+          conteudo: novoConteudo, 
+          vinculos: novoVinculos, 
+          arquivo_ids: novoArquivos.map(a => a.id) 
+        }),
       })
       if (!res.ok) throw new Error()
       toast.success('Comentário adicionado!')
       setNovoConteudo('')
       setNovoVinculos([])
+      setNovoArquivos([])
+      setShowUploadNovoComentario(false)
       load()
     } catch { toast.error('Erro ao comentar.') }
     finally { setSavingComentario(false) }
@@ -91,7 +163,10 @@ export default function TopicoPage() {
       await fetch(`/api/forum/${id}/comentarios/${cid}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conteudo: editConteudo }),
+        body: JSON.stringify({ 
+          conteudo: editConteudo,
+          arquivo_ids: editComentarioArquivos.map(a => a.id) // <-- Envia os arquivos
+        }),
       })
       setEditandoId(null)
       load()
@@ -108,40 +183,43 @@ export default function TopicoPage() {
   }
 
   async function salvarTopico() {
-  setSavingTopico(true)
-  try {
-    const res = await fetch(`/api/forum/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ titulo: editTitulo, conteudo: editConteudo, vinculos: editVinculos }),
-    })
-    if (!res.ok) throw new Error()
+    if (!editTitulo.trim() || !editConteudoTopico.trim()) {
+      toast.error('Preencha os campos obrigatórios.')
+      return
+    }
+    setSavingTopico(true)
+    try {
+      const res = await fetch(`/api/forum/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          titulo: editTitulo, 
+          conteudo: editConteudoTopico, 
+          vinculos: editVinculos,
+          arquivo_ids: editArquivos.map(a => a.id)
+        }),
+      })
+      if (!res.ok) throw new Error()
 
-    // Atualizar vínculos: deletar todos e recriar
-    // (adicionar endpoint de vínculos ou tratar no PATCH)
-    toast.success('Tópico atualizado!')
-    setEditandoTopico(false)
-    load()
-  } catch { toast.error('Erro ao salvar.') }
-  finally { setSavingTopico(false) }
-}
+      toast.success('Tópico atualizado!')
+      setEditandoTopico(false)
+      setShowUploadEditTopico(false)
+      load()
+    } catch { toast.error('Erro ao salvar.') }
+    finally { setSavingTopico(false) }
+  }
 
   async function deletarTopico() {
     setDeleting(true)
-
     try {
-      const res = await fetch(`/api/forum/${id}`, {
-        method: 'DELETE',
-      })
-
+      const res = await fetch(`/api/forum/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error()
-
       toast.success('Tópico removido com sucesso.')
       router.push('/forum')
       router.refresh()
     } catch {
       toast.error('Erro ao remover tópico.')
-    } finally {
+    } {
       setDeleting(false)
       setShowDeleteConfirm(false)
     }
@@ -174,9 +252,10 @@ export default function TopicoPage() {
               {topico.fixado && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-600"><Pin className="w-3 h-3" />Fixado</span>}
               {topico.fechado && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-slate-400"><Lock className="w-3 h-3" />Fechado</span>}
             </div>
-            <h1 className="text-lg font-bold text-slate-900 dark:text-white">{topico.titulo}</h1>
+            {!editandoTopico && <h1 className="text-lg font-bold text-slate-900 dark:text-white">{topico.titulo}</h1>}
           </div>
-          {/* Ações admin */}
+          
+          {/* Ações admin / autor */}
           {(topico.autor_id === userId || perfil === 'admin') && (
             <div className="flex gap-1 shrink-0">
               {perfil === 'admin' && (
@@ -186,9 +265,7 @@ export default function TopicoPage() {
                     onClick={() => toggleAdmin('fixado')}
                     title={topico.fixado ? 'Desafixar' : 'Fixar'}
                     className={`p-1.5 rounded-lg transition ${
-                      topico.fixado
-                        ? 'text-amber-600 bg-amber-50 dark:bg-amber-950'
-                        : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      topico.fixado ? 'text-amber-600 bg-amber-50 dark:bg-amber-950' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                   >
                     <Pin className="w-3.5 h-3.5" />
@@ -199,9 +276,7 @@ export default function TopicoPage() {
                     onClick={() => toggleAdmin('fechado')}
                     title={topico.fechado ? 'Abrir' : 'Fechar'}
                     className={`p-1.5 rounded-lg transition ${
-                      topico.fechado
-                        ? 'text-slate-600 bg-slate-100 dark:bg-slate-800'
-                        : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      topico.fechado ? 'text-slate-600 bg-slate-100 dark:bg-slate-800' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                   >
                     <Lock className="w-3.5 h-3.5" />
@@ -217,12 +292,14 @@ export default function TopicoPage() {
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
-              {(topico.autor_id === userId || perfil === 'admin') && !editandoTopico && (
+              
+              {!editandoTopico && (
                 <button type="button"
                   onClick={() => {
                     setEditTitulo(topico.titulo)
-                    setEditConteudo(topico.conteudo)
+                    setEditConteudoTopico(topico.conteudo)
                     setEditVinculos(topico.vinculos ?? [])
+                    setEditArquivos(topico.arquivos ?? [])
                     setEditandoTopico(true)
                   }}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 transition"
@@ -233,45 +310,77 @@ export default function TopicoPage() {
             </div>
           )}
         </div>
+
         {editandoTopico ? (
-  <div className="space-y-3 mb-3">
-    <input
-      value={editTitulo}
-      onChange={e => setEditTitulo(e.target.value)}
-      className={inp}
-      placeholder="Título"
-    />
-    <textarea
-      value={editConteudo}
-      onChange={e => setEditConteudo(e.target.value)}
-      rows={6}
-      className={inp}
-      placeholder="Conteúdo"
-    />
-    <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/40">
-      <ItemVincularSelect vinculos={editVinculos} onChange={setEditVinculos} />
-    </div>
-    <div className="flex gap-2">
-      <button type="button" onClick={salvarTopico} disabled={savingTopico}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 transition">
-        {savingTopico ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-        Salvar
-      </button>
-      <button type="button" onClick={() => setEditandoTopico(false)}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition">
-        <X className="w-3 h-3" /> Cancelar
-      </button>
-    </div>
-  </div>
-) : (
-  <>
-    <h1 className="text-lg font-bold text-slate-900 dark:text-white">{topico.titulo}</h1>
-    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed mb-3 mt-2">
-      {topico.conteudo}
-    </p>
-    <VinculosSection vinculos={topico.vinculos ?? []} />
-  </>
-)}
+          <div className="space-y-4 mb-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Título *</label>
+              <input value={editTitulo} onChange={e => setEditTitulo(e.target.value)} className={inp} placeholder="Título" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Conteúdo *</label>
+              <textarea value={editConteudoTopico} onChange={e => setEditConteudoTopico(e.target.value)} rows={6} className={inp} placeholder="Conteúdo" />
+            </div>
+            
+            <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/40">
+              <ItemVincularSelect vinculos={editVinculos} onChange={setEditVinculos} />
+            </div>
+
+            {/* Upload de arquivos na Edição do Tópico */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Anexos do Tópico</label>
+                {editArquivos.length > 0 && <span className="text-xs text-slate-500">{editArquivos.length} arquivo(s)</span>}
+              </div>
+
+              {showUploadEditTopico ? (
+                <FileUploadButton parentId={id} parentType="topico" onFileUpload={handleFileUploadEditTopico} disabled={savingTopico} />
+              ) : (
+                <button type="button" onClick={() => setShowUploadEditTopico(true)} className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+                  + Adicionar ou substituir arquivo
+                </button>
+              )}
+
+              {editArquivos.length > 0 && (
+                <div className="space-y-2">
+                  {editArquivos.map(arquivo => (
+                    <ForumFileEmbed key={arquivo.id} {...arquivo} canDelete={true} onDelete={deleteFileEditTopico} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button type="button" onClick={salvarTopico} disabled={savingTopico}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 transition">
+                {savingTopico ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                Salvar alterações
+              </button>
+              <button type="button" onClick={() => { setEditandoTopico(false); setShowUploadEditTopico(false) }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+                <X className="w-3 h-3" /> Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed mb-4 mt-2">
+              {topico.conteudo}
+            </p>
+            
+            {/* Listagem estática de arquivos originais do Tópico */}
+            {topico.arquivos && topico.arquivos.length > 0 && (
+              <div className="space-y-2 mb-4 border-t border-slate-100 dark:border-slate-800/60 pt-3">
+                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">Arquivos anexados:</p>
+                {topico.arquivos.map((arquivo: any) => (
+                  <ForumFileEmbed key={arquivo.id} {...arquivo} canDelete={false} />
+                ))}
+              </div>
+            )}
+
+            <VinculosSection vinculos={topico.vinculos ?? []} />
+          </>
+        )}
       </div>
 
       {/* Comentários */}
@@ -293,13 +402,20 @@ export default function TopicoPage() {
                   {(c.autor_id === userId || perfil === 'admin') && (
                     <div className="flex gap-1">
                       {c.autor_id === userId && editandoId !== c.id && (
-                        <button type="button" onClick={() => { setEditandoId(c.id); setEditConteudo(c.conteudo) }}
-                          className="p-1 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 transition">
+                        <button type="button" onClick={() => { 
+                            setEditandoId(c.id); 
+                            setEditConteudo(c.conteudo);
+                            setEditComentarioArquivos(c.arquivos ?? []); // <-- Carrega arquivos existentes
+                            setShowUploadEditComentario(false);
+                          }}
+                          className="p-1 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 transition"
+                          title="Editar comentário">
                           <Pencil className="w-3 h-3" />
                         </button>
                       )}
                       <button type="button" onClick={() => deletarComentario(c.id)}
-                        className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition">
+                        className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition"
+                        title="Deletar comentário">
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
@@ -307,23 +423,59 @@ export default function TopicoPage() {
                 </div>
 
                 {editandoId === c.id ? (
-                  <div className="space-y-2">
-                    <textarea value={editConteudo} onChange={e => setEditConteudo(e.target.value)} rows={4} className={inp} />
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => salvarEdicao(c.id)}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                        <Check className="w-3 h-3" /> Salvar
-                      </button>
-                      <button type="button" onClick={() => setEditandoId(null)}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition">
-                        <X className="w-3 h-3" /> Cancelar
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                    {c.conteudo}
-                  </p>
+  <div className="space-y-3">
+    <textarea value={editConteudo} onChange={e => setEditConteudo(e.target.value)} rows={4} className={inp} />
+    
+    {/* Upload de arquivos na Edição do Comentário */}
+    <div className="space-y-3 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-3">
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Anexos do Comentário</label>
+        {editComentarioArquivos.length > 0 && <span className="text-xs text-slate-500">{editComentarioArquivos.length} arquivo(s)</span>}
+      </div>
+
+      {showUploadEditComentario ? (
+        <FileUploadButton parentId={c.id} parentType="comentario" onFileUpload={handleFileUploadEditComentario} disabled={false} />
+      ) : (
+        <button type="button" onClick={() => setShowUploadEditComentario(true)} className="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+          + Adicionar ou substituir arquivo
+        </button>
+      )}
+
+      {editComentarioArquivos.length > 0 && (
+        <div className="space-y-2">
+          {editComentarioArquivos.map(arquivo => (
+            <ForumFileEmbed key={arquivo.id} {...arquivo} canDelete={true} onDelete={deleteFileEditComentario} />
+          ))}
+        </div>
+      )}
+    </div>
+
+    <div className="flex gap-2">
+      <button type="button" onClick={() => salvarEdicao(c.id)}
+        className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+        <Check className="w-3 h-3" /> Salvar
+      </button>
+      <button type="button" onClick={() => setEditandoId(null)}
+        className="flex items-center gap-1 px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+        <X className="w-3 h-3" /> Cancelar
+      </button>
+    </div>
+  </div>
+) : (
+                  <>
+                    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                      {c.conteudo}
+                    </p>
+                    
+                    {/* Exibição dos arquivos anexados ao comentário */}
+                    {c.arquivos && c.arquivos.length > 0 && (
+                      <div className="space-y-2 mt-3 pt-2 border-t border-slate-50 dark:border-slate-800/40">
+                        {c.arquivos.map((arquivo: any) => (
+                          <ForumFileEmbed key={arquivo.id} {...arquivo} canDelete={false} />
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <VinculosSection vinculos={c.vinculos ?? []} />
@@ -344,10 +496,40 @@ export default function TopicoPage() {
           <form onSubmit={submitComentario} className="space-y-3">
             <textarea value={novoConteudo} onChange={e => setNovoConteudo(e.target.value)} rows={4}
               placeholder="Escreva sua resposta..." className={inp} />
+            
             <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/40">
               <ItemVincularSelect vinculos={novoVinculos} onChange={setNovoVinculos} />
             </div>
-            <div className="flex justify-end">
+
+            {/* Upload de arquivos no Novo Comentário */}
+            <div className="space-y-3 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Anexar mídias ao comentário (opcional)
+                </label>
+                {novoArquivos.length > 0 && (
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{novoArquivos.length} arquivo(s)</span>
+                )}
+              </div>
+
+              {showUploadNovoComentario ? (
+                <FileUploadButton parentId={tempComentarioId} parentType="comentario" onFileUpload={handleFileUploadNovoComentario} disabled={savingComentario} />
+              ) : (
+                <button type="button" onClick={() => setShowUploadNovoComentario(true)} className="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+                  + Adicionar arquivo
+                </button>
+              )}
+
+              {novoArquivos.length > 0 && (
+                <div className="space-y-2">
+                  {novoArquivos.map(arquivo => (
+                    <ForumFileEmbed key={arquivo.id} {...arquivo} canDelete={true} onDelete={deleteFileNovoComentario} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-1">
               <button type="submit" disabled={savingComentario || !novoConteudo.trim()}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60 transition">
                 {savingComentario && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -362,53 +544,30 @@ export default function TopicoPage() {
           Este tópico está fechado para novos comentários.
         </div>
       )}
+
+      {/* Modal de confirmação de exclusão */}
       {showDeleteConfirm && (
-        <AnimatedDialogFrame
-          onClose={() => setShowDeleteConfirm(false)}
-          zClassName="z-[60]"
-          className="max-w-md rounded-xl border border-slate-100 p-6 dark:border-slate-800"
-        >
+        <AnimatedDialogFrame onClose={() => setShowDeleteConfirm(false)} zClassName="z-[60]" className="max-w-md rounded-xl border border-slate-100 p-6 dark:border-slate-800">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950 flex items-center justify-center shrink-0">
               <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
             </div>
-
             <div>
-              <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-                Excluir tópico
-              </h2>
-
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Esta ação não pode ser desfeita.
-              </p>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white">Excluir tópico</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Esta ação não pode ser desfeita.</p>
             </div>
           </div>
-
           <p className="text-sm text-slate-700 dark:text-slate-300 mb-5">
-            Deseja realmente excluir o tópico{' '}
-            <strong>"{topico.titulo}"</strong>?
+            Deseja realmente excluir o tópico <strong>"{topico.titulo}"</strong>?
           </p>
-
           <div className="flex gap-2 justify-end">
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(false)}
-              disabled={deleting}
-              className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
-            >
+            <button type="button" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}
+              className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
               Cancelar
             </button>
-
-            <button
-              type="button"
-              onClick={deletarTopico}
-              disabled={deleting}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition disabled:opacity-60"
-            >
-              {deleting && (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              )}
-
+            <button type="button" onClick={deletarTopico} disabled={deleting}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition disabled:opacity-60">
+              {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               Confirmar exclusão
             </button>
           </div>
