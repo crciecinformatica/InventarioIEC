@@ -5,13 +5,41 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ItemVincularSelect } from '@/components/forum/item-vincular-select'
+import { FileUploadButton } from '@/components/forum/file-upload-button'
+import { ForumFileEmbed } from '@/components/forum/forum-file-embed'
+
+interface UploadedFile {
+  id: string
+  nome_original: string
+  tipo_arquivo: string
+  tamanho_bytes: number
+  url_publica: string
+}
 
 export default function NovoTopicoPage() {
   const router = useRouter()
   const [titulo, setTitulo]     = useState('')
   const [conteudo, setConteudo] = useState('')
   const [vinculos, setVinculos] = useState<any[]>([])
+  const [arquivos, setArquivos] = useState<UploadedFile[]>([])
   const [saving, setSaving]     = useState(false)
+  const [showUpload, setShowUpload] = useState(false)
+  const tempTopicoId = 'temp-' + Math.random().toString(36).substr(2, 9)
+
+  function handleFileUpload(file: UploadedFile) {
+    setArquivos(prev => [...prev, file])
+  }
+
+  async function deleteFile(fileId: string) {
+    try {
+      const res = await fetch(`/api/forum/arquivos/${fileId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      setArquivos(prev => prev.filter(f => f.id !== fileId))
+    } catch (error) {
+      console.error('Delete error:', error)
+      throw error
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -21,7 +49,7 @@ export default function NovoTopicoPage() {
       const res = await fetch('/api/forum', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo, conteudo, vinculos }),
+        body: JSON.stringify({ titulo, conteudo, vinculos, arquivo_ids: arquivos.map(a => a.id) }),
       })
       if (!res.ok) throw new Error()
       const topico = await res.json()
@@ -56,6 +84,51 @@ export default function NovoTopicoPage() {
 
         <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-4 bg-slate-50/50 dark:bg-slate-900/40">
           <ItemVincularSelect vinculos={vinculos} onChange={setVinculos} />
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+              Anexar imagens ou PDFs (opcional)
+            </label>
+            {arquivos.length > 0 && (
+              <span className="text-xs text-slate-500 dark:text-slate-400">{arquivos.length} arquivo(s)</span>
+            )}
+          </div>
+
+          {showUpload ? (
+            <FileUploadButton
+              parentId={tempTopicoId}
+              parentType="topico"
+              onFileUpload={handleFileUpload}
+              disabled={saving}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowUpload(true)}
+              className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+            >
+              + Adicionar arquivo
+            </button>
+          )}
+
+          {arquivos.length > 0 && (
+            <div className="space-y-2">
+              {arquivos.map(arquivo => (
+                <ForumFileEmbed
+                  key={arquivo.id}
+                  id={arquivo.id}
+                  nome_original={arquivo.nome_original}
+                  tipo_arquivo={arquivo.tipo_arquivo}
+                  tamanho_bytes={arquivo.tamanho_bytes}
+                  url_publica={arquivo.url_publica}
+                  canDelete={true}
+                  onDelete={deleteFile}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3 justify-end pt-2">

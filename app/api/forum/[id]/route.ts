@@ -17,10 +17,12 @@ export async function GET(_: Request, { params }: Props) {
       where: { id },
       include: {
         vinculos: true,
+        arquivos: true, // <-- ADICIONADO: Traz as imagens anexadas no tópico
         comentarios: {
           orderBy: { created_at: 'asc' },
           include: {
             vinculos: true,
+            arquivos: true, // <-- ADICIONADO: Traz as imagens anexadas nos comentários
             reacoes:  { select: { usuario_id: true, tipo: true } },
           },
         },
@@ -62,6 +64,7 @@ export async function PATCH(request: Request, { params }: Props) {
 
     const updated = await prisma.forum_topicos.update({ where: { id }, data })
     
+    // 1. Lógica existente para Vínculos
     if (Array.isArray(body.vinculos)) {
       await prisma.forum_vinculos.deleteMany({ where: { topico_id: id } })
       if (body.vinculos.length > 0) {
@@ -74,6 +77,15 @@ export async function PATCH(request: Request, { params }: Props) {
           })),
         })
       }
+    }
+
+    // 2. <-- ADICIONADO: Lógica para Arquivos
+    // Se recebeu um array de arquivo_ids (do upload de novas imagens na edição)
+    if (Array.isArray(body.arquivo_ids) && body.arquivo_ids.length > 0) {
+      await prisma.forum_arquivos.updateMany({
+        where: { id: { in: body.arquivo_ids } },
+        data: { topico_id: id },
+      })
     }
 
     return NextResponse.json(updated)

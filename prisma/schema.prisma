@@ -20,6 +20,7 @@ model usuarios {
   forum_comentarios forum_comentarios[]
   forum_reacoes     forum_reacoes[]
   forum_topicos     forum_topicos[]
+  forum_arquivos    forum_arquivos[]
 }
 
 model setores {
@@ -342,6 +343,7 @@ model forum_topicos {
   comentarios forum_comentarios[]
   autor       usuarios?           @relation(fields: [autor_id], references: [id])
   vinculos    forum_vinculos[]
+  arquivos    forum_arquivos[]
 }
 
 model forum_comentarios {
@@ -357,6 +359,7 @@ model forum_comentarios {
   topico     forum_topicos    @relation(fields: [topico_id], references: [id], onDelete: Cascade)
   reacoes    forum_reacoes[]
   vinculos   forum_vinculos[]
+  arquivos   forum_arquivos[]
 }
 
 model forum_vinculos {
@@ -381,6 +384,26 @@ model forum_reacoes {
   usuario       usuarios          @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
 
   @@unique([comentario_id, usuario_id, tipo])
+}
+
+model forum_arquivos {
+  id               String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  topico_id        String?            @db.Uuid
+  comentario_id    String?            @db.Uuid
+  usuario_id       String?            @db.Uuid
+  tipo_arquivo     String             // MIME type: image/jpeg, image/png, application/pdf
+  nome_original    String             // Original filename
+  nome_armazenado  String             // Path in Supabase Storage
+  tamanho_bytes    Int
+  url_publica      String             // Public URL to access the file
+  created_at       DateTime?          @default(now()) @db.Timestamptz(6)
+  comentario       forum_comentarios? @relation(fields: [comentario_id], references: [id], onDelete: Cascade)
+  topico           forum_topicos?     @relation(fields: [topico_id], references: [id], onDelete: Cascade)
+  usuario          usuarios?          @relation(fields: [usuario_id], references: [id], onDelete: SetNull)
+
+  @@index([topico_id], map: "idx_forum_arquivos_topico_id")
+  @@index([comentario_id], map: "idx_forum_arquivos_comentario_id")
+  @@index([usuario_id], map: "idx_forum_arquivos_usuario_id")
 }
 
 enum categoria_equipamento {
