@@ -13,7 +13,7 @@ CREATE TABLE forum_arquivos (
   
   -- At least one of topico_id or comentario_id must be NOT NULL
   CONSTRAINT chk_arquivo_vinculo CHECK (
-    (topico_id IS NULL) <> (comentario_id IS NULL)
+    topico_id IS NULL OR comentario_id IS NULL
   )
 );
 
@@ -21,3 +21,4 @@ CREATE TABLE forum_arquivos (
 CREATE INDEX idx_forum_arquivos_topico_id ON forum_arquivos(topico_id);
 CREATE INDEX idx_forum_arquivos_comentario_id ON forum_arquivos(comentario_id);
 CREATE INDEX idx_forum_arquivos_usuario_id ON forum_arquivos(usuario_id);
+
