@@ -1,0 +1,491 @@
+'use client'
+
+import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  Folder, FolderOpen, FileText, FileImage, File,
+  ChevronRight, Plus, Upload, Trash2, Loader2,
+  Home, Download, X, Pencil, FolderPlus,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { useSession } from 'next-auth/react'
+import { formatDate } from '@/lib/utils'
+
+interface Pasta {
+  id: string
+  nome: string
+  descricao: string | null
+  cor: string | null
+  parent_id: string | null
+  created_at: string | null
+  _count: { filhos: number; arquivos: number }
+}
+
+interface Arquivo {
+  id: string
+  nome_original: string
+  tipo_arquivo: string
+  tamanho_bytes: number
+  url_publica: string
+  usuario_id: string | null
+  created_at: string | null
+}
+
+const COR_OPTIONS = [
+  '#3b82f6', '#8b5cf6', '#06b6d4', '#10b981',
+  '#f59e0b', '#ef4444', '#ec4899', '#64748b',
+]
+
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function getFileIcon(mime?: string | null) {
+  if (!mime) return <File className="w-5 h-5 text-slate-400" />
+  if (mime.startsWith('image/'))   return <FileImage className="w-5 h-5 text-blue-500" />
+  if (mime === 'application/pdf')  return <FileText className="w-5 h-5 text-red-500" />
+  return <File className="w-5 h-5 text-slate-400" />
+}
+
+export default function DocumentosPage() {
+  const { data: session } = useSession()
+  const perfil = (session?.user as any)?.perfil as string
+  const isAdmin = perfil === 'admin'
+
+  const [pastas, setPastas]         = useState<Pasta[]>([])
+  const [arquivos, setArquivos]     = useState<Arquivo[]>([])
+  const [breadcrumb, setBreadcrumb] = useState<{ id: string; nome: string }[]>([])
+  const [currentId, setCurrentId]   = useState<string | null>(null)
+  const [loading, setLoading]       = useState(true)
+
+  // Modais
+  const [showNovaPasta, setShowNovaPasta]   = useState(false)
+  const [showUpload, setShowUpload]         = useState(false)
+  const [editandoPasta, setEditandoPasta]   = useState<Pasta | null>(null)
+  const [confirmDelete, setConfirmDelete]   = useState<{ tipo: 'pasta' | 'arquivo'; id: string; nome: string } | null>(null)
+
+  // Form nova pasta
+  const [novaNome, setNovaNome]   = useState('')
+  const [novaDesc, setNovaDesc]   = useState('')
+  const [novaCor, setNovaCor]     = useState('#3b82f6')
+  const [savingPasta, setSavingPasta] = useState(false)
+
+  // Upload
+  const [uploadFile, setUploadFile]   = useState<File | null>(null)
+  const [uploadDesc, setUploadDesc]   = useState('')
+  const [uploading, setUploading]     = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const load = useCallback(async (id: string | null = currentId) => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (id) params.set('parent_id', id)
+      const res  = await fetch(`/api/forum/pastas?${params}`)
+      const json = await res.json()
+      setPastas(json.pastas || [])
+      setArquivos(json.arquivos || [])
+      setBreadcrumb(json.breadcrumb || [])
+    } catch { toast.error('Erro ao carregar.') }
+    finally { setLoading(false) }
+  }, [currentId])
+
+  useEffect(() => { load(currentId) }, [currentId])
+
+  function navigate(id: string | null) {
+    setCurrentId(id)
+  }
+
+  // Criar pasta
+  async function handleCriarPasta() {
+    if (!novaNome.trim()) return
+    setSavingPasta(true)
+    try {
+      const res = await fetch('/api/forum/pastas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: novaNome, descricao: novaDesc, parent_id: currentId, cor: novaCor }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Pasta criada!')
+      setShowNovaPasta(false)
+      setNovaNome(''); setNovaDesc(''); setNovaCor('#3b82f6')
+      load(currentId)
+    } catch { toast.error('Erro ao criar pasta.') }
+    finally { setSavingPasta(false) }
+  }
+
+  // Editar pasta
+  async function handleSalvarEdicao() {
+    if (!editandoPasta) return
+    setSavingPasta(true)
+    try {
+      await fetch(`/api/forum/pastas/${editandoPasta.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: novaNome, descricao: novaDesc, cor: novaCor }),
+      })
+      toast.success('Pasta atualizada!')
+      setEditandoPasta(null)
+      setNovaNome(''); setNovaDesc(''); setNovaCor('#3b82f6')
+      load(currentId)
+    } catch { toast.error('Erro ao salvar.') }
+    finally { setSavingPasta(false) }
+  }
+
+  // Upload
+  async function handleUpload() {
+    if (!uploadFile || !currentId) return
+    setUploading(true)
+    setUploadProgress(10)
+    try {
+      const formData = new FormData()
+      formData.append('file', uploadFile)
+      if (uploadDesc) formData.append('descricao', uploadDesc)
+
+      setUploadProgress(40)
+      const res = await fetch(`/api/forum/pastas/${currentId}/upload`, {
+        method: 'POST',
+        body: formData,
+      })
+      setUploadProgress(90)
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erro no upload')
+      }
+
+      setUploadProgress(100)
+      toast.success('Arquivo enviado!')
+      setShowUpload(false)
+      setUploadFile(null)
+      setUploadDesc('')
+      load(currentId)
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao enviar arquivo.')
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
+  // Deletar
+  async function handleDelete() {
+    if (!confirmDelete) return
+    try {
+      const url = confirmDelete.tipo === 'pasta'
+        ? `/api/forum/pastas/${confirmDelete.id}`
+        : `/api/forum/arquivos/${confirmDelete.id}`
+      await fetch(url, { method: 'DELETE' })
+      toast.success(`${confirmDelete.tipo === 'pasta' ? 'Pasta' : 'Arquivo'} removido.`)
+      setConfirmDelete(null)
+      load(currentId)
+    } catch { toast.error('Erro ao remover.') }
+  }
+
+  const inp = "w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+  return (
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Documentos</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Arquivos e tutoriais do setor de TI
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <button type="button" onClick={() => { setShowNovaPasta(true); setEditandoPasta(null); setNovaNome(''); setNovaDesc(''); setNovaCor('#3b82f6') }}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+              <FolderPlus className="w-4 h-4" /> Nova pasta
+            </button>
+          )}
+          {currentId && (
+            <button type="button" onClick={() => setShowUpload(true)}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
+              <Upload className="w-4 h-4" /> Enviar arquivo
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-1 text-sm mb-4 flex-wrap">
+        <button type="button" onClick={() => navigate(null)}
+          className="flex items-center gap-1 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition">
+          <Home className="w-3.5 h-3.5" /> Início
+        </button>
+        {breadcrumb.map(b => (
+          <span key={b.id} className="flex items-center gap-1">
+            <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
+            <button type="button" onClick={() => navigate(b.id)}
+              className="text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition">
+              {b.nome}
+            </button>
+          </span>
+        ))}
+      </div>
+
+      {/* Conteúdo */}
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="h-24 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+          ))}
+        </div>
+      ) : pastas.length === 0 && arquivos.length === 0 ? (
+        <div className="text-center py-20 text-slate-400">
+          <Folder className="w-14 h-14 mx-auto mb-3 opacity-20" />
+          <p className="text-sm font-medium">Pasta vazia</p>
+          <p className="text-xs mt-1">
+            {isAdmin ? 'Crie uma nova pasta ou envie um arquivo.' : 'Nenhum arquivo aqui ainda.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Pastas */}
+          {pastas.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                Pastas ({pastas.length})
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {pastas.map(pasta => (
+                  <div key={pasta.id} className="group relative">
+                    <button type="button" onDoubleClick={() => navigate(pasta.id)}
+                      onClick={() => navigate(pasta.id)}
+                      className="w-full flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-200 dark:hover:border-slate-700 hover:shadow-sm transition text-center">
+                      <div className="relative">
+                        <Folder className="w-12 h-12" style={{ color: pasta.cor ?? '#3b82f6' }} />
+                        {(pasta._count.filhos + pasta._count.arquivos) > 0 && (
+                          <span className="absolute -bottom-1 -right-1 text-[9px] font-bold bg-white dark:bg-slate-900 rounded-full px-1 text-slate-400 border border-slate-100 dark:border-slate-800">
+                            {pasta._count.filhos + pasta._count.arquivos}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate w-full">{pasta.nome}</span>
+                      {pasta.descricao && (
+                        <span className="text-[10px] text-slate-400 truncate w-full">{pasta.descricao}</span>
+                      )}
+                    </button>
+                    {isAdmin && (
+                      <div className="absolute top-1.5 right-1.5 hidden group-hover:flex gap-1">
+                        <button type="button" onClick={e => {
+                          e.stopPropagation()
+                          setEditandoPasta(pasta)
+                          setNovaNome(pasta.nome)
+                          setNovaDesc(pasta.descricao ?? '')
+                          setNovaCor(pasta.cor ?? '#3b82f6')
+                          setShowNovaPasta(true)
+                        }} className="p-1 rounded-md bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-400 hover:text-blue-500 transition shadow-sm">
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button type="button" onClick={e => {
+                          e.stopPropagation()
+                          setConfirmDelete({ tipo: 'pasta', id: pasta.id, nome: pasta.nome })
+                        }} className="p-1 rounded-md bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-400 hover:text-red-500 transition shadow-sm">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Arquivos */}
+          {arquivos.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                Arquivos ({arquivos.length})
+              </p>
+              <div className="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
+                {/* Header */}
+                <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_100px] gap-4 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  <span>Nome</span>
+                  <span>Enviado por</span>
+                  <span>Data</span>
+                  <span>Tamanho</span>
+                </div>
+                {arquivos.map((arq, i) => (
+                  <div key={arq.id}
+                    className={`grid grid-cols-[minmax(0,2fr)_1fr_1fr_100px] gap-4 px-4 py-3 items-center border-t border-slate-50 dark:border-slate-800 group ${i % 2 === 1 ? 'bg-slate-50/40 dark:bg-slate-800/20' : ''}`}>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {getFileIcon(arq.tipo_arquivo)}
+                      <div className="min-w-0">
+                        <a href={arq.url_publica} target="_blank" rel="noopener noreferrer"
+                          className="text-sm font-medium text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 transition truncate block">
+                          {arq.nome_original}
+                        </a>
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-500 truncate">{arq.usuario_id}</span>
+                    <span className="text-xs text-slate-400">{formatDate(arq.created_at)}</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400">{formatSize(arq.tamanho_bytes)}</span>
+                      <div className="hidden group-hover:flex gap-1">
+                        <a href={arq.url_publica} download target="_blank" rel="noopener noreferrer"
+                          className="p-1 rounded text-slate-400 hover:text-blue-500 transition">
+                          <Download className="w-3.5 h-3.5" />
+                        </a>
+                        <button type="button" onClick={() => setConfirmDelete({ tipo: 'arquivo', id: arq.id, nome: arq.nome_original })}
+                          className="p-1 rounded text-slate-400 hover:text-red-500 transition">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal Nova/Editar Pasta */}
+      {showNovaPasta && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowNovaPasta(false); setEditandoPasta(null) }} />
+          <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-100 dark:border-slate-800">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-4">
+              {editandoPasta ? 'Editar pasta' : 'Nova pasta'}
+            </h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Nome *</label>
+                <input value={novaNome} onChange={e => setNovaNome(e.target.value)} className={inp} placeholder="Ex: Tutoriais" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Descrição</label>
+                <input value={novaDesc} onChange={e => setNovaDesc(e.target.value)} className={inp} placeholder="Opcional" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Cor</label>
+                <div className="flex gap-2 flex-wrap">
+                  {COR_OPTIONS.map(cor => (
+                    <button key={cor} type="button" onClick={() => setNovaCor(cor)}
+                      className={`w-7 h-7 rounded-full transition ${novaCor === cor ? 'ring-2 ring-offset-2 ring-slate-400 dark:ring-offset-slate-900 scale-110' : 'hover:scale-105'}`}
+                      style={{ backgroundColor: cor }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button type="button" onClick={() => { setShowNovaPasta(false); setEditandoPasta(null) }}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+                Cancelar
+              </button>
+              <button type="button" onClick={editandoPasta ? handleSalvarEdicao : handleCriarPasta} disabled={savingPasta || !novaNome.trim()}
+                className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60 transition">
+                {savingPasta && <Loader2 className="w-4 h-4 animate-spin" />}
+                {editandoPasta ? 'Salvar' : 'Criar pasta'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Upload */}
+      {showUpload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !uploading && setShowUpload(false)} />
+          <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-100 dark:border-slate-800">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-4">Enviar arquivo</h2>
+            <div className="space-y-3">
+              {/* Drop zone */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => {
+                  e.preventDefault()
+                  const f = e.dataTransfer.files[0]
+                  if (f) setUploadFile(f)
+                }}
+                className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 dark:hover:border-blue-600 transition">
+                <input ref={fileInputRef} type="file" className="hidden"
+                  accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt"
+                  onChange={e => setUploadFile(e.target.files?.[0] ?? null)} />
+                {uploadFile ? (
+                  <div className="flex items-center justify-center gap-2">
+                    {getFileIcon(uploadFile.type)}
+                    <div className="text-left min-w-0">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{uploadFile.name}</p>
+                      <p className="text-xs text-slate-400">{formatSize(uploadFile.size)}</p>
+                    </div>
+                    <button type="button" onClick={e => { e.stopPropagation(); setUploadFile(null) }}
+                      className="text-slate-400 hover:text-red-500 transition ml-1">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Clique ou arraste o arquivo</p>
+                    <p className="text-[11px] text-slate-400 mt-1">PDF, imagens, Word, Excel, TXT — máx 20MB</p>
+                  </>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Descrição</label>
+                <input value={uploadDesc} onChange={e => setUploadDesc(e.target.value)} className={inp} placeholder="Opcional" />
+              </div>
+              {uploading && uploadProgress > 0 && (
+                <div>
+                  <div className="flex justify-between text-xs text-slate-400 mb-1">
+                    <span>Enviando...</span><span>{uploadProgress}%</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button type="button" onClick={() => setShowUpload(false)} disabled={uploading}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-60">
+                Cancelar
+              </button>
+              <button type="button" onClick={handleUpload} disabled={!uploadFile || uploading}
+                className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60 transition">
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {uploading ? 'Enviando...' : 'Enviar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Delete */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmDelete(null)} />
+          <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-100 dark:border-slate-800">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-2">
+              Remover {confirmDelete.tipo === 'pasta' ? 'pasta' : 'arquivo'}
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+              Remover <strong>"{confirmDelete.nome}"</strong>?
+              {confirmDelete.tipo === 'pasta' && ' Todo o conteúdo interno será removido permanentemente.'}
+            </p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setConfirmDelete(null)}
+                className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+                Cancelar
+              </button>
+              <button type="button" onClick={handleDelete}
+                className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition">
+                Remover
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

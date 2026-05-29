@@ -9,7 +9,8 @@ import {
   Phone, Server, ScrollText, ChevronLeft,
   PanelLeftOpen, LogOut, Sun, Moon, Menu, X, UserCog, Loader2,
   ChevronDown,
-  MessageSquare
+  MessageSquare,
+  FolderOpen
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
@@ -53,7 +54,6 @@ const navGroups: NavGroup[] = [
     icon: ScrollText,
     items: [
       { href: '/movimentacoes', label: 'Auditoria', icon: ScrollText },
-      { href: '/forum', label: 'Fórum', icon: ScrollText },
     ],
   },
   {
@@ -62,6 +62,14 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/colaboradores', label: 'Colaboradores', icon: Users },
       { href: '/usuarios', label: 'Usuários', icon: UserCog, adminOnly: true },
+    ],
+  },
+  {
+    label: 'Forum',
+    icon: MessageSquare,
+    items: [
+      { href: '/forum', label: 'Fórum', icon: ScrollText },
+      { href: '/forum/documentos', label: 'Documentos', icon: FolderOpen },
     ],
   },
 ]
