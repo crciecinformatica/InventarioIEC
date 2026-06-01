@@ -87,10 +87,12 @@ export function Sidebar() {
     return navGroups.find(group => group.items.some(item => pathname.startsWith(item.href)))?.label ?? 'Alocações'
   })
 
+  const perfil = session?.user?.perfil
+  const canManageUsers = perfil === 'admin' || perfil === 'dev'
   const navGroupsFiltrados = navGroups
     .map(group => ({
       ...group,
-      items: group.items.filter(item => !item.adminOnly || session?.user?.perfil === 'admin'),
+      items: group.items.filter(item => !item.adminOnly || canManageUsers),
     }))
     .filter(group => group.items.length > 0)
 

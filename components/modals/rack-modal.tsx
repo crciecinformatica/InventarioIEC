@@ -15,6 +15,7 @@ import { useCrud } from '@/hooks/use-crud'
 import { optionalInt } from '@/lib/zod-helpers'
 import type { Rack } from '@/types'
 import { AnimatedSheetFrame } from '@/components/layout/motion-primitives'
+import { DeviceCommentsPopover } from '@/components/forum/device-comments-popover'
 
 const schema = z.object({
   nome_switch:             z.string().optional().nullable(),
@@ -75,6 +76,7 @@ export function RackModal({ rack, onClose, onRefresh }: Props) {
 
   return (
     <>
+      <DeviceCommentsPopover tipoItem="racks" itemId={rack.id} />
       <AnimatedSheetFrame onClose={onClose}>
 
           {/* Header */}

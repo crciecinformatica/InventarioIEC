@@ -39,12 +39,27 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.perfil = (user as any).perfil
+        token.name = user.name
+        token.email = user.email
+      } else if (token.email) {
+        const usuario = await prisma.usuarios.findUnique({
+          where: { email: token.email as string, ativo: true },
+          select: { id: true, nome: true, email: true, perfil: true },
+        })
+        if (usuario) {
+          token.id = usuario.id
+          token.name = usuario.nome
+          token.email = usuario.email
+          token.perfil = usuario.perfil ?? 'viewer'
+        }
       }
       return token
     },
     async session({ session, token }) {
       if (token && session.user) {
         (session.user as any).id = token.id
+        session.user.name = token.name ?? session.user.name
+        session.user.email = token.email ?? session.user.email
         ;(session.user as any).perfil = token.perfil
       }
       return session
@@ -65,11 +80,15 @@ export const authOptions: NextAuthOptions = {
 export async function requireAdmin(): Promise<NextResponse | null> {
   const session = await getServerSession(authOptions)
   const perfil = (session?.user as any)?.perfil ?? 'viewer'
-  if (perfil !== 'admin') {
+  if (!isPrivilegedProfile(perfil)) {
     return NextResponse.json(
-      { error: 'Acesso negado. Apenas administradores podem realizar esta ação.' },
+      { error: 'Acesso negado. Apenas administradores e desenvolvimento podem realizar esta ação.' },
       { status: 403 },
     )
   }
   return null
+}
+
+export function isPrivilegedProfile(perfil?: string | null) {
+  return perfil === 'admin' || perfil === 'dev'
 }

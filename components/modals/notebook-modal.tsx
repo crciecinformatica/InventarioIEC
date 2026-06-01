@@ -19,6 +19,7 @@ import { SetorSelect } from "./setor-select";
 import { LocalidadeSelect } from "./localidade-select";
 import { formatDate } from "@/lib/utils";
 import { AnimatedDialogFrame } from "@/components/layout/motion-primitives";
+import { DeviceCommentsPopover } from "@/components/forum/device-comments-popover";
 
 const schema = z.object({
  modelo: z.string().optional().nullable(),
@@ -191,6 +192,7 @@ export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
 
  return (
   <>
+   <DeviceCommentsPopover tipoItem="notebooks" itemId={notebook.id} />
    <AnimatedDialogFrame onClose={onClose} className="flex max-h-[90vh] max-w-4xl flex-col rounded-2xl">
      {/* Header */}
      <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">

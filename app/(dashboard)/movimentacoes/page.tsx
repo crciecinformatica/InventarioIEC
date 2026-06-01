@@ -6,16 +6,15 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/tables/data-table'
 import {
   AuditOverviewPanel,
+  notifyOverviewFilter,
   type OverviewFilter,
-  OverviewFilterToastDescription,
 } from '@/components/tables/device-overview-panel'
 import { PageHeader } from '@/components/layout/page-header'
 import { AuditLogModal } from '@/components/modals/audit-log-modal'
 import { useFetchData } from '@/hooks/use-fetch-data'
 import { Search } from 'lucide-react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ACAO_COLORS, ACAO_LABELS, TABELAS_OPCOES, type AuditLog } from '@/lib/audit-constants'
-import { toast } from 'sonner'
 import { useInspectNavigation } from '@/hooks/use-inspect-navigation'
 
 function AcaoBadge({ acao }: { acao: string }) {
@@ -31,23 +30,29 @@ export default function MovimentacoesPage() {
   const [refreshKey] = useState(0)
   const [selected, setSelected] = useState<AuditLog | null>(null)
   const { openInspect, closeInspect } = useInspectNavigation<AuditLog>(setSelected)
-  const [tabela, setTabela] = useState('')
-  const [acao, setAcao] = useState('')
-  const [usuario, setUsuario] = useState('')
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const inspectId = searchParams.get('inspect') 
+  const [tabela, setTabela] = useState(searchParams.get('tabela') || '')
+  const [acao, setAcao] = useState(searchParams.get('acao') || '')
+  const [usuario, setUsuario] = useState(searchParams.get('usuario') || '')
+  const [usuarioId, setUsuarioId] = useState(searchParams.get('usuario_id') || '')
+  const [usuarioLabel, setUsuarioLabel] = useState(searchParams.get('usuario_label') || '')
+  const [edicoes, setEdicoes] = useState(searchParams.get('edicoes') === '1' ? '1' : '')
   const [overviewData, setOverviewData] = useState<AuditLog[]>([])
   const [overviewTotal, setOverviewTotal] = useState(0)
   const [overviewLoading, setOverviewLoading] = useState(true)
   const [activeOverviewFilter, setActiveOverviewFilter] = useState<{
     label: string
+    key: string
+    filter: OverviewFilter
     predicate: (item: AuditLog) => boolean
   } | null>(null)
   const [overviewFilterLoading, setOverviewFilterLoading] = useState(false)
-  const searchParams = useSearchParams()
-  const inspectId = searchParams.get('inspect') 
 
   const { data, total, totalPages, loading } = useFetchData<AuditLog>(
     'audit-log',
-    { tabela, acao, usuario },
+    { tabela, acao, usuario, usuario_id: usuarioId, edicoes },
     page,
     refreshKey
   )
@@ -55,17 +60,110 @@ export default function MovimentacoesPage() {
   const filteredOverviewData = activeOverviewFilter
     ? overviewData.filter(activeOverviewFilter.predicate)
     : null
+  const urlAuditUserFilter = usuarioLabel
+    ? {
+        kind: 'audit-user',
+        value: usuarioId || usuarioLabel,
+        label: `Responsavel: ${usuarioLabel}`,
+      }
+    : null
+  const auditOverviewActiveFilters = activeOverviewFilter
+    ? [activeOverviewFilter.filter]
+    : urlAuditUserFilter
+      ? [urlAuditUserFilter]
+    : undefined
   const tableData = filteredOverviewData
     ? filteredOverviewData.slice((page - 1) * 20, page * 20)
     : data
   const tableTotal = filteredOverviewData?.length ?? total
   const tableTotalPages = filteredOverviewData ? Math.max(1, Math.ceil(filteredOverviewData.length / 20)) : totalPages
 
+  function overviewFilterKey(filter: { kind: string; value?: string }) {
+    return `${filter.kind}:${filter.value ?? ''}`
+  }
+
+  function isUuid(value?: string) {
+    return Boolean(value?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i))
+  }
+
+  function replaceAuditUrl(next: {
+    tabela?: string
+    acao?: string
+    usuario?: string
+    usuarioId?: string
+    usuarioLabel?: string
+    edicoes?: string
+  }) {
+    const params = new URLSearchParams()
+    const nextTabela = next.tabela ?? tabela
+    const nextAcao = next.acao ?? acao
+    const nextUsuario = next.usuario ?? usuario
+    const nextUsuarioId = next.usuarioId ?? usuarioId
+    const nextUsuarioLabel = next.usuarioLabel ?? usuarioLabel
+    const nextEdicoes = next.edicoes ?? edicoes
+
+    if (nextTabela) params.set('tabela', nextTabela)
+    if (nextAcao) params.set('acao', nextAcao)
+    if (nextUsuario) params.set('usuario', nextUsuario)
+    if (nextUsuarioId) params.set('usuario_id', nextUsuarioId)
+    if (nextUsuarioLabel) params.set('usuario_label', nextUsuarioLabel)
+    if (nextEdicoes) params.set('edicoes', nextEdicoes)
+
+    const query = params.toString()
+    router.replace(`/movimentacoes${query ? `?${query}` : ''}`, { scroll: false })
+  }
+
+  function clearAuditUserFilter() {
+    setActiveOverviewFilter(null)
+    setUsuarioId('')
+    setUsuarioLabel('')
+    setUsuario('')
+    setEdicoes('')
+    setPage(1)
+    replaceAuditUrl({ usuario: '', usuarioId: '', usuarioLabel: '', edicoes: '' })
+  }
+
   function applyOverviewFilter(filter: OverviewFilter) {
     if (filter.kind === 'all') {
+      clearAuditUserFilter()
+      notifyOverviewFilter([])
+      return
+    }
+
+    const filterKey = overviewFilterKey(filter)
+    const selectedKey = activeOverviewFilter?.key ?? (urlAuditUserFilter ? overviewFilterKey(urlAuditUserFilter) : '')
+    if (filter.kind !== 'audit-user' && activeOverviewFilter?.key === filterKey) {
       setActiveOverviewFilter(null)
       setPage(1)
-      toast.success('Filtro do overview removido.')
+      notifyOverviewFilter([])
+      return
+    }
+    if (filter.kind === 'audit-user' && filterKey === selectedKey) {
+      clearAuditUserFilter()
+      notifyOverviewFilter([])
+      return
+    }
+
+    if (filter.kind === 'audit-user') {
+      const value = filter.value ?? ''
+      const nextUsuarioId = isUuid(value) ? value : ''
+      const nextUsuario = nextUsuarioId ? '' : value
+      const nextLabel = (filter.label ?? value).replace(/^Responsavel:\s*/i, '') || value || 'Sem responsavel'
+      setActiveOverviewFilter(null)
+      setUsuarioId(nextUsuarioId)
+      setUsuario(nextUsuario)
+      setUsuarioLabel(nextLabel)
+      setAcao('')
+      setEdicoes('1')
+      setPage(1)
+      replaceAuditUrl({
+        usuarioId: nextUsuarioId,
+        usuario: nextUsuario,
+        usuarioLabel: nextLabel,
+        acao: '',
+        edicoes: '1',
+      })
+      notifyOverviewFilter([{ ...filter, label: `Responsavel: ${nextLabel}` }])
       return
     }
 
@@ -84,22 +182,27 @@ export default function MovimentacoesPage() {
         predicate: (item) => item.acao === labelToAction,
       },
       'audit-user': {
-        label: `Responsavel: ${filter.value ?? 'Sem responsavel'}`,
-        predicate: (item) => (item.usuario_nome || 'Sem responsavel') === filter.value,
+        label: filter.label ?? `Responsavel: ${filter.value ?? 'Sem responsavel'}`,
+        predicate: (item) => item.usuario_id === filter.value || (item.usuario_nome || 'Sem responsavel') === filter.value,
       },
     }
 
     const nextFilter = predicates[filter.kind]
     if (!nextFilter) return
 
-    const description = <OverviewFilterToastDescription label={nextFilter.label} filter={filter} />
-    const toastId = toast.loading('Aplicando filtro do overview...', { description })
     setOverviewFilterLoading(true)
+    if (usuarioId || usuarioLabel || edicoes) {
+      setUsuarioId('')
+      setUsuarioLabel('')
+      setUsuario('')
+      setEdicoes('')
+      replaceAuditUrl({ usuario: '', usuarioId: '', usuarioLabel: '', edicoes: '' })
+    }
     window.setTimeout(() => {
-      setActiveOverviewFilter(nextFilter)
+      setActiveOverviewFilter({ ...nextFilter, key: filterKey, filter })
       setPage(1)
       setOverviewFilterLoading(false)
-      toast.success('Filtro aplicado.', { id: toastId, description })
+      notifyOverviewFilter([{ ...filter, label: nextFilter.label }])
     }, 120)
   }
 
@@ -109,6 +212,8 @@ export default function MovimentacoesPage() {
       setOverviewLoading(true)
       try {
         const params = new URLSearchParams({ page: '1', limit: '10000', sort: 'created_at', dir: 'desc' })
+        if (tabela) params.set('tabela', tabela)
+        if (acao) params.set('acao', acao)
         const res = await fetch(`/api/audit-log?${params}`)
         const json = await res.json()
         if (!cancelled) {
@@ -124,7 +229,7 @@ export default function MovimentacoesPage() {
 
     fetchOverview()
     return () => { cancelled = true }
-  }, [refreshKey])
+  }, [refreshKey, tabela, acao])
 
   const columns = useMemo<ColumnDef<AuditLog, unknown>[]>(() => [
     {
@@ -184,14 +289,12 @@ export default function MovimentacoesPage() {
     .catch(() => {})
 }, [inspectId])
 
-  const inputCls = "px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-
   const filters = (
     <>
       <select
         value={tabela}
         onChange={(e) => { setTabela(e.target.value); setPage(1) }}
-        className={inputCls}
+        className="crc-select w-auto min-w-48"
       >
         <option value="">Todos os módulos</option>
         {TABELAS_OPCOES.map(t => (
@@ -202,7 +305,8 @@ export default function MovimentacoesPage() {
       <select
         value={acao}
         onChange={(e) => { setAcao(e.target.value); setPage(1) }}
-        className={inputCls}
+        disabled={edicoes === '1'}
+        className="crc-select w-auto min-w-44 disabled:opacity-60"
       >
         <option value="">Todas as ações</option>
         <option value="CREATE">Criação</option>
@@ -211,17 +315,37 @@ export default function MovimentacoesPage() {
         <option value="ALOCAR">Alocação</option>
         <option value="DESALOCAR">Desalocação</option>
         <option value="EDITAR_ALOCACAO">Edição de Alocação</option>
+        <option value="APROVAR">Aprovação</option>
+        <option value="REJEITAR">Rejeição</option>
       </select>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input
           value={usuario}
-          onChange={(e) => { setUsuario(e.target.value); setPage(1) }}
-          placeholder="Filtrar por responsável..."
+          onChange={(e) => {
+            setUsuario(e.target.value)
+            setUsuarioId('')
+            setUsuarioLabel('')
+            setEdicoes('')
+            setActiveOverviewFilter(null)
+            setPage(1)
+          }}
+          placeholder={usuarioId ? 'Filtro por usuário selecionado' : 'Filtrar por responsável...'}
           className="pl-9 pr-4 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
         />
       </div>
+      {(usuarioId || usuarioLabel) && (
+        <button
+          type="button"
+          onClick={clearAuditUserFilter}
+          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300"
+          title={usuarioId || usuarioLabel}
+        >
+          {edicoes === '1' ? 'Edições de ' : 'Ações de '}
+          {usuarioLabel || 'usuário selecionado'}
+        </button>
+      )}
     </>
   )
 
@@ -236,6 +360,7 @@ export default function MovimentacoesPage() {
       <AuditOverviewPanel
         total={overviewTotal || total}
         items={overviewData}
+        activeFilters={auditOverviewActiveFilters}
         isLoading={overviewLoading}
         onFilter={applyOverviewFilter}
       />

@@ -31,14 +31,14 @@ export async function GET(request: Request) {
     const enderecoIp = searchParams.get('endereco_ip')  || ''
     const fabricante= searchParams.get('fabricante') || ''
     const alocacao  = searchParams.get('alocacao')   || ''
-    const sort      = searchParams.get('sort')       || 'nome_host'
+    const sort      = searchParams.get('sort')       || 'endereco_ip'
     const dir: Prisma.SortOrder = searchParams.get('dir') === 'desc' ? 'desc' : 'asc'
 
     const validSortFields: Record<string, boolean> = {
       nome_host: true, identificador: true, fabricante: true,
-      modelo: true, created_at: true, enderecoIp: true, setor_id: true,
+      modelo: true, created_at: true, endereco_ip: true, enderecoIp: true, setor_id: true,
     }
-    const safeSort = validSortFields[sort] ? sort : 'nome_host'
+    const safeSort = validSortFields[sort] ? sort : 'endereco_ip'
 
     const AND: any[] = []
 
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
 
     const orderBy = safeSort === 'setor_id'
       ? { setor_rel: { nome: dir } }
-      : { [safeSort]: dir }
+      : { [safeSort === 'enderecoIp' ? 'endereco_ip' : safeSort]: dir }
 
     const [data, total] = await Promise.all([
       prisma.maquinas.findMany({

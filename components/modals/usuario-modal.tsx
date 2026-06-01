@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { X, Loader2, Trash2, ShieldCheck, Eye, EyeOff } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -12,24 +13,27 @@ import { AnimatedSheetFrame } from '@/components/layout/motion-primitives'
 
 const newSchema = z.object({
   nome: z.string().min(2, 'Nome obrigatório'),
+  codigo_pessoa: z.string().optional().or(z.literal('')),
   email: z.string().email('E-mail inválido'),
   senha: z.string().min(6, 'Mínimo 6 caracteres'),
-  perfil: z.enum(['admin', 'viewer']),
+  perfil: z.enum(['admin', 'dev', 'viewer']),
   ativo: z.boolean(),
 })
 
 const editSchema = z.object({
   id: z.string(),
   nome: z.string().min(2, 'Nome obrigatório'),
+  codigo_pessoa: z.string().optional().or(z.literal('')),
   email: z.string().email('E-mail inválido'),
   senha: z.string().min(6, 'Mínimo 6 caracteres').optional().or(z.literal('')),
-  perfil: z.enum(['admin', 'viewer']),
+  perfil: z.enum(['admin', 'dev', 'viewer']),
   ativo: z.boolean(),
 })
 
 interface Usuario {
   id: string
   nome: string
+  codigo_pessoa?: string | null
   email: string
   perfil: string
   ativo: boolean
@@ -43,7 +47,9 @@ interface Props {
 }
 
 export function UsuarioModal({ usuario, onClose, onRefresh }: Props) {
+  const { data: session } = useSession()
   const isNew = !usuario
+  const canEditRoles = (session?.user as any)?.perfil === 'dev'
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -54,9 +60,10 @@ export function UsuarioModal({ usuario, onClose, onRefresh }: Props) {
     defaultValues: {
       id: usuario?.id || '',
       nome: usuario?.nome || '',
+      codigo_pessoa: usuario?.codigo_pessoa || '',
       email: usuario?.email || '',
       senha: '',
-      perfil: (usuario?.perfil as 'admin' | 'viewer') || 'viewer',
+      perfil: (usuario?.perfil as 'admin' | 'dev' | 'viewer') || 'viewer',
       ativo: usuario?.ativo ?? true,
     },
   })
@@ -68,7 +75,14 @@ export function UsuarioModal({ usuario, onClose, onRefresh }: Props) {
   async function onSubmit(data: any) {
     setSaving(true)
     try {
-      const payload: any = { id: data.id, nome: data.nome, email: data.email, perfil: data.perfil, ativo: data.ativo }
+      const payload: any = {
+        id: data.id,
+        nome: data.nome,
+        codigo_pessoa: data.codigo_pessoa,
+        email: data.email,
+        perfil: canEditRoles ? data.perfil : (usuario?.perfil ?? 'viewer'),
+        ativo: data.ativo,
+      }
       if (data.senha) payload.senha = data.senha
 
       const res = await fetch(
@@ -133,6 +147,11 @@ export function UsuarioModal({ usuario, onClose, onRefresh }: Props) {
               {errors.nome && <p className={errCls}>{errors.nome.message as string}</p>}
             </div>
             <div>
+              <label className={labelCls}>Código de pessoa</label>
+              <input {...register('codigo_pessoa')} className={inputCls} placeholder="Ex: 12345" />
+              {errors.codigo_pessoa && <p className={errCls}>{errors.codigo_pessoa.message as string}</p>}
+            </div>
+            <div>
               <label className={labelCls}>E-mail</label>
               <input {...register('email')} type="email" className={inputCls} placeholder="email@iec.com.br" />
               {errors.email && <p className={errCls}>{errors.email.message as string}</p>}
@@ -158,13 +177,25 @@ export function UsuarioModal({ usuario, onClose, onRefresh }: Props) {
               </div>
               {errors.senha && <p className={errCls}>{errors.senha.message as string}</p>}
             </div>
-            <div>
-              <label className={labelCls}>Perfil de acesso</label>
-              <select {...register('perfil')} className={inputCls}>
-                <option value="viewer">Visualizador — somente leitura</option>
-                <option value="admin">Administrador — acesso total</option>
-              </select>
-            </div>
+            {canEditRoles ? (
+              <div>
+                <label className={labelCls}>Perfil de acesso</label>
+                <select {...register('perfil')} className="crc-select">
+                  <option value="viewer">Visualizador — somente leitura</option>
+                  <option value="dev">Desenvolvimento — acesso técnico</option>
+                  <option value="admin">Administrador — acesso total</option>
+                </select>
+              </div>
+            ) : (
+              !isNew && (
+                <div>
+                  <p className={labelCls}>Perfil de acesso</p>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                    {perfilLabel(usuario.perfil)}
+                  </div>
+                </div>
+              )
+            )}
             {!isNew && (
               <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800">
                 <input
@@ -216,4 +247,10 @@ export function UsuarioModal({ usuario, onClose, onRefresh }: Props) {
       )}
     </>
   )
+}
+
+function perfilLabel(perfil: string) {
+  if (perfil === 'admin') return 'Administrador — acesso total'
+  if (perfil === 'dev') return 'Desenvolvimento — acesso técnico'
+  return 'Visualizador — somente leitura'
 }

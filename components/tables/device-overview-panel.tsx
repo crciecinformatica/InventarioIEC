@@ -176,6 +176,7 @@ interface ColaboradorOverviewPanelProps {
 interface AuditOverviewPanelProps {
   total: number
   items: AuditLog[]
+  activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
 }
@@ -446,6 +447,36 @@ function groupByLabel<T>(items: T[], getLabel: (item: T) => string, total: numbe
       detail: `${pct(count, total)}% do total`,
       color: getSectorColor(label),
       distribution: pct(count, total),
+    }))
+    .sort((a, b) => Number(b.value) - Number(a.value))
+
+  return applyDistinctColors(grouped)
+}
+
+function groupAuditUsers(items: AuditLog[], total: number) {
+  const grouped = Array.from(
+    items.reduce((map, item) => {
+      const key = item.usuario_id || item.usuario_nome || 'Sem responsavel'
+      const current = map.get(key)
+      if (current) {
+        current.count += 1
+      } else {
+        map.set(key, {
+          label: item.usuario_nome || 'Sem responsavel',
+          filterValue: item.usuario_id || item.usuario_nome || 'Sem responsavel',
+          count: 1,
+        })
+      }
+      return map
+    }, new Map<string, { label: string; filterValue: string; count: number }>())
+  )
+    .map(([, item]) => ({
+      label: item.label,
+      value: String(item.count),
+      detail: `${pct(item.count, total)}% do total`,
+      color: getSectorColor(item.filterValue),
+      distribution: pct(item.count, total),
+      filterValue: item.filterValue,
     }))
     .sort((a, b) => Number(b.value) - Number(a.value))
 
@@ -1269,14 +1300,14 @@ export function notifyOverviewFilter(filters: ActiveOverviewFilterState[]) {
   ), { id: toastId })
 }
 
-export function AuditOverviewPanel({ total, items, isLoading = false, onFilter }: AuditOverviewPanelProps) {
+export function AuditOverviewPanel({ total, items, activeFilters, isLoading = false, onFilter }: AuditOverviewPanelProps) {
   const scopedItems = items
   const analyzedTotal = scopedItems.length
   const displayedTotal = total || analyzedTotal
   const edits = scopedItems.filter(item => item.acao === 'UPDATE' || item.acao === 'EDITAR_ALOCACAO')
   const deletes = scopedItems.filter(item => item.acao === 'DELETE')
   const latest = latestDate(edits.map(item => item.created_at)) ?? latestDate(scopedItems.map(item => item.created_at))
-  const users = groupByLabel(edits, item => item.usuario_nome || 'Sem responsavel', edits.length)
+  const users = groupAuditUsers(edits, edits.length)
   const actions = groupByLabel(scopedItems, item => ACAO_LABELS[item.acao] || item.acao || 'Sem acao', scopedItems.length)
   const latestLabel = latest ? formatDate(String(latest)) : '—'
 
@@ -1300,7 +1331,11 @@ export function AuditOverviewPanel({ total, items, isLoading = false, onFilter }
         {
           title: 'Edicoes por responsavel',
           icon: <Users className="h-3.5 w-3.5" />,
-          items: users.map(item => ({ ...item, detail: `${item.detail} · edicoes`, filter: { kind: 'audit-user', value: item.label } })),
+          items: users.map(item => ({
+            ...item,
+            detail: `${item.detail} · edicoes`,
+            filter: { kind: 'audit-user', value: item.filterValue, label: `Responsavel: ${item.label}`, color: item.color },
+          })),
           emptyMessage: 'Sem edicoes por responsavel.',
         },
         {
@@ -1321,6 +1356,7 @@ export function AuditOverviewPanel({ total, items, isLoading = false, onFilter }
         },
       ]}
       onFilter={onFilter}
+      activeFilters={activeFilters}
       isLoading={isLoading}
     />
   )

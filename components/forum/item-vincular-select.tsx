@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { Search, Loader2, X, Monitor, Laptop, Smartphone, Printer, Phone, Server } from 'lucide-react'
 
 type TipoItem = 'maquinas' | 'notebooks' | 'aparelhos' | 'impressoras' | 'ramais' | 'racks'
@@ -25,6 +26,7 @@ export function ItemVincularSelect({ vinculos, onChange }: Props) {
   const [tipo, setTipo]       = useState<TipoItem>('maquinas')
   const [query, setQuery]     = useState('')
   const [results, setResults] = useState<any[]>([])
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [open, setOpen]       = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -43,17 +45,31 @@ export function ItemVincularSelect({ vinculos, onChange }: Props) {
     }, 300)
   }, [query, tipo])
 
-  function addVinculo(result: any) {
-    const label = result.label
-    if (vinculos.find(v => v.item_id === result.id)) return
-    onChange([...vinculos, { tipo_item: tipo, item_id: result.id, item_label: label }])
+  function addSelecionados() {
+    const selected = results.filter(result => checkedIds.has(result.id))
+    if (selected.length === 0) return
+    const existing = new Set(vinculos.map(v => `${v.tipo_item}:${v.item_id}`))
+    const next = selected
+      .map(result => ({ tipo_item: tipo, item_id: result.id, item_label: result.label }))
+      .filter(v => !existing.has(`${v.tipo_item}:${v.item_id}`))
+    onChange([...vinculos, ...next])
     setQuery('')
     setResults([])
+    setCheckedIds(new Set())
     setOpen(false)
   }
 
   function removeVinculo(item_id: string) {
     onChange(vinculos.filter(v => v.item_id !== item_id))
+  }
+
+  function toggleChecked(id: string) {
+    setCheckedIds(current => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   const inp = "w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -65,23 +81,32 @@ export function ItemVincularSelect({ vinculos, onChange }: Props) {
       </p>
 
       {/* Chips dos vínculos */}
+      <AnimatePresence initial={false}>
       {vinculos.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <motion.div layout className="flex flex-wrap gap-2">
           {vinculos.map(v => {
             const cfg = TIPOS.find(t => t.value === v.tipo_item)
             const Icon = cfg?.icon ?? Monitor
             return (
-              <span key={v.item_id} className="inline-flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-medium px-2.5 py-1 rounded-full border border-blue-100 dark:border-blue-900">
+              <motion.span
+                key={`${v.tipo_item}-${v.item_id}`}
+                layout
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.92 }}
+                className="inline-flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-medium px-2.5 py-1 rounded-full border border-blue-100 dark:border-blue-900"
+              >
                 <Icon className="w-3 h-3 shrink-0" />
                 {v.item_label}
                 <button type="button" onClick={() => removeVinculo(v.item_id)} className="ml-0.5 hover:text-red-500 transition">
                   <X className="w-3 h-3" />
                 </button>
-              </span>
+              </motion.span>
             )
           })}
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Seletor de tipo */}
       <div className="flex gap-1 flex-wrap">
@@ -110,12 +135,32 @@ export function ItemVincularSelect({ vinculos, onChange }: Props) {
             <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
             <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
               {results.map(r => (
-                <button key={r.id} type="button" onClick={() => addVinculo(r)}
-                  className="w-full text-left px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 transition border-b border-slate-50 dark:border-slate-700/50 last:border-0">
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{r.label}</p>
-                  {r.sub && <p className="text-xs text-slate-400">{r.sub}</p>}
-                </button>
+                <label key={r.id}
+                  className="flex cursor-pointer items-start gap-3 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 transition border-b border-slate-50 dark:border-slate-700/50 last:border-0">
+                  <input
+                    type="checkbox"
+                    checked={checkedIds.has(r.id)}
+                    onChange={() => toggleChecked(r.id)}
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-slate-800 dark:text-slate-200">{r.label}</span>
+                    {r.sub && <span className="block text-xs text-slate-400">{r.sub}</span>}
+                    {r.meta && <span className="block text-[11px] text-slate-400">{r.meta}</span>}
+                  </span>
+                </label>
               ))}
+              <div className="sticky bottom-0 flex items-center justify-between border-t border-slate-100 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
+                <span className="text-xs text-slate-400">{checkedIds.size} selecionado(s)</span>
+                <button
+                  type="button"
+                  onClick={addSelecionados}
+                  disabled={checkedIds.size === 0}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Anexar selecionados
+                </button>
+              </div>
             </div>
           </>
         )}

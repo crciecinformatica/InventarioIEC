@@ -46,8 +46,8 @@ export function AnimatedSheetFrame({
   zClassName = 'z-50',
 }: CloseableMotionShellProps) {
   const reduceMotion = useReducedMotion()
-  const sheetInitial = reduceMotion ? { opacity: 0 } : { x: 'calc(100% + 24px)' }
-  const sheetExit = reduceMotion ? { opacity: 0 } : { x: 'calc(100% + 24px)' }
+  const sheetInitial = reduceMotion ? { opacity: 0 } : { x: 'calc(100% + 32px)', opacity: 0.96 }
+  const sheetExit = reduceMotion ? { opacity: 0 } : { x: 'calc(100% + 32px)', opacity: 0.92 }
 
   return (
     <motion.div
@@ -55,7 +55,7 @@ export function AnimatedSheetFrame({
       initial={reduceMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.18, ease }}
+      transition={{ duration: 0.22, ease }}
     >
       <motion.div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -63,7 +63,7 @@ export function AnimatedSheetFrame({
         initial={reduceMotion ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.18, ease }}
+        transition={{ duration: 0.22, ease }}
       />
       <motion.aside
         className={cn('fixed bottom-0 right-0 top-0 w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden', className)}
@@ -72,7 +72,7 @@ export function AnimatedSheetFrame({
         animate={{ x: 0, opacity: 1 }}
         exit={sheetExit}
         style={{ willChange: 'transform' }}
-        transition={{ type: 'spring', stiffness: 460, damping: 42, mass: 0.9 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 44, mass: 0.95 }}
       >
         {children}
       </motion.aside>

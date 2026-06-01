@@ -12,6 +12,7 @@ datasource db {
 model usuarios {
   id                String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   nome              String
+  codigo_pessoa     String?
   email             String              @unique
   senha_hash        String
   perfil            String?             @default("viewer")
@@ -21,7 +22,31 @@ model usuarios {
   forum_reacoes     forum_reacoes[]
   forum_topicos     forum_topicos[]
   forum_arquivos    forum_arquivos[]
-  forum_pastas   forum_pastas[]
+  forum_pastas      forum_pastas[]
+
+  @@index([codigo_pessoa], map: "idx_usuarios_codigo_pessoa")
+}
+
+model solicitacoes_usuarios {
+  id              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nome            String
+  codigo_pessoa   String
+  email           String
+  senha_hash      String
+  status          String    @default("pendente")
+  observacao      String?
+  usuario_id      String?   @db.Uuid
+  aprovado_por_id String?   @db.Uuid
+  aprovado_por    String?
+  aprovado_em     DateTime? @db.Timestamptz(6)
+  rejeitado_por_id String?  @db.Uuid
+  rejeitado_por   String?
+  rejeitado_em    DateTime? @db.Timestamptz(6)
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([status], map: "idx_solicitacoes_usuarios_status")
+  @@index([email], map: "idx_solicitacoes_usuarios_email")
 }
 
 model setores {
@@ -353,6 +378,8 @@ model forum_comentarios {
   autor_id   String?          @db.Uuid
   autor_nome String
   conteudo   String
+  tipo        String           @default("permanente")
+  expira_em   DateTime?        @db.Timestamptz(6)
   editado    Boolean          @default(false)
   created_at DateTime?        @default(now()) @db.Timestamptz(6)
   updated_at DateTime?        @default(now()) @db.Timestamptz(6)

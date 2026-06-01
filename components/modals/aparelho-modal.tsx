@@ -19,6 +19,7 @@ import { AlocacoesAtivasSection } from './alocacoes-ativas-section'
 import { SetorSelect } from './setor-select'
 import { LocalidadeSelect } from './localidade-select'
 import { AnimatedDialogFrame } from '@/components/layout/motion-primitives'
+import { DeviceCommentsPopover } from '@/components/forum/device-comments-popover'
 
 const schema = z.object({
   modelo: z.string().optional().nullable(),
@@ -113,6 +114,7 @@ export function AparelhoModal({ aparelho, onClose, onRefresh }: Props) {
 
   return (
     <>
+      <DeviceCommentsPopover tipoItem="aparelhos" itemId={aparelho.id} />
       <AnimatedDialogFrame onClose={onClose} className="flex max-h-[90vh] max-w-4xl flex-col rounded-2xl">
 
           <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">

@@ -7,6 +7,7 @@ export type InspectResourceType =
   | 'impressora'
   | 'rack'
   | 'movimentacao'
+  | 'usuario'
 
 export type InspectContext = {
   path: string
@@ -33,6 +34,7 @@ const RESOURCE_BY_PATH: Record<string, { type: InspectResourceType; label: strin
   '/impressoras': { type: 'impressora', label: 'Impressora' },
   '/racks': { type: 'rack', label: 'Rack' },
   '/movimentacoes': { type: 'movimentacao', label: 'Auditoria' },
+  '/usuarios': { type: 'usuario', label: 'Usuário' },
 }
 
 export function buildHref(path: string, params: URLSearchParams) {
