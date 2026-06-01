@@ -10,6 +10,7 @@ import {
   createInspectContext,
   getInspectPreviewFromContext,
   getReturnOptions,
+  INSPECT_CONTEXT_HISTORY_EVENT,
   readInspectHistory,
   updateInspectHistory,
   writePendingInspectPreview,
@@ -174,6 +175,15 @@ export function InspectContextReturn() {
     }, 0)
     return () => window.clearTimeout(timeout)
   }, [pathname, searchString])
+
+  useEffect(() => {
+    function handleHistoryUpdate() {
+      setHistory(readInspectHistory(window.sessionStorage))
+    }
+
+    window.addEventListener(INSPECT_CONTEXT_HISTORY_EVENT, handleHistoryUpdate)
+    return () => window.removeEventListener(INSPECT_CONTEXT_HISTORY_EVENT, handleHistoryUpdate)
+  }, [])
 
   const options = getReturnOptions(history, currentHref)
   const visible = options.length > 0

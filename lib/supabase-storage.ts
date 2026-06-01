@@ -1,9 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { getSupabase } from '@/lib/supabase'
 
 const BUCKET = 'forum-docs'
 
@@ -16,6 +11,7 @@ export async function uploadArquivo(
   const ext      = fileName.split('.').pop()
   const safeName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
   const fullPath = `${pastaPath}/${safeName}`
+  const supabase = getSupabase()
 
   const { error } = await supabase.storage
     .from(BUCKET)
@@ -28,5 +24,6 @@ export async function uploadArquivo(
 }
 
 export async function deleteArquivo(storagePath: string) {
+  const supabase = getSupabase()
   await supabase.storage.from(BUCKET).remove([storagePath])
 }

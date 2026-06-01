@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { deleteArquivo } from '@/lib/supabase-storage'
+import { registrarAuditoria } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 type Props = { params: Promise<{ id: string }> }
@@ -14,6 +15,7 @@ export async function DELETE(_: Request, { params }: Props) {
 
     const { id }   = await params
     const userId   = (session.user as any).id as string
+    const userName = session.user?.name ?? 'Usuário'
     const perfil   = (session.user as any).perfil as string
 
     const arquivo = await prisma.forum_arquivos.findUnique({ where: { id } })
@@ -24,6 +26,15 @@ export async function DELETE(_: Request, { params }: Props) {
 
     await deleteArquivo(arquivo.nome_armazenado)
     await prisma.forum_arquivos.delete({ where: { id } })
+    await registrarAuditoria({
+      tabela: 'forum_arquivos',
+      registro_id: id,
+      acao: 'DELETE',
+      descricao: `Arquivo "${arquivo.nome_original}" removido do fórum`,
+      dados_anteriores: arquivo as any,
+      usuario_id: userId,
+      usuario_nome: userName,
+    })
     return NextResponse.json({ ok: true })
   } catch (err) {
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

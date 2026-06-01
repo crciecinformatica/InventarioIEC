@@ -22,7 +22,8 @@ export async function GET(request: Request) {
   const sortDir = searchParams.get('dir') === 'asc' ? 'asc' : 'desc'
 
   const where: any = {}
-  if (tabela) where.tabela = tabela
+  if (tabela === 'forum') where.tabela = { startsWith: 'forum_' }
+  else if (tabela) where.tabela = tabela
   if (edicoes) where.acao = { in: ['UPDATE', 'EDITAR_ALOCACAO'] }
   else if (acao) where.acao = acao
   if (usuario_id) where.usuario_id = usuario_id

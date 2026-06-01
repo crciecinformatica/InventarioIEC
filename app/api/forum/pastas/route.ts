@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { registrarAuditoria } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
     const userId = (session.user as any).id as string
+    const userName = session.user?.name ?? 'Usuário'
     const { nome, descricao, parent_id, cor } = await request.json()
 
     if (!nome?.trim()) return NextResponse.json({ error: 'Nome obrigatório' }, { status: 400 })
@@ -64,6 +66,16 @@ export async function POST(request: Request) {
         criado_por: userId,
         cor:       cor || '#3b82f6',
       },
+    })
+
+    await registrarAuditoria({
+      tabela: 'forum_pastas',
+      registro_id: pasta.id,
+      acao: 'CREATE',
+      descricao: `Pasta "${pasta.nome}" criada em documentos do fórum`,
+      dados_novos: pasta as any,
+      usuario_id: userId,
+      usuario_nome: userName,
     })
 
     return NextResponse.json(pasta, { status: 201 })

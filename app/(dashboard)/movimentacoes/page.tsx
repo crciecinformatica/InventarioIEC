@@ -169,6 +169,10 @@ export default function MovimentacoesPage() {
 
     const labelToAction = Object.entries(ACAO_LABELS).find(([, label]) => label === filter.value)?.[0] ?? filter.value
     const predicates: Record<string, { label: string; predicate: (item: AuditLog) => boolean }> = {
+      'audit-forum': {
+        label: 'Fórum',
+        predicate: (item) => item.tabela.startsWith('forum_'),
+      },
       'audit-edits': {
         label: 'Edicoes registradas',
         predicate: (item) => item.acao === 'UPDATE' || item.acao === 'EDITAR_ALOCACAO',
@@ -180,6 +184,14 @@ export default function MovimentacoesPage() {
       'audit-action-label': {
         label: `Acao: ${filter.value}`,
         predicate: (item) => item.acao === labelToAction,
+      },
+      'audit-inventory-action-label': {
+        label: `Inventário: ${filter.value}`,
+        predicate: (item) => !item.tabela.startsWith('forum_') && item.acao === labelToAction,
+      },
+      'audit-forum-action-label': {
+        label: `Fórum: ${filter.value}`,
+        predicate: (item) => item.tabela.startsWith('forum_') && item.acao === labelToAction,
       },
       'audit-user': {
         label: filter.label ?? `Responsavel: ${filter.value ?? 'Sem responsavel'}`,

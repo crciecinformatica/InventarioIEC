@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { registrarAuditoria } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 
@@ -98,8 +99,27 @@ export async function POST(request: Request) {
           _count: { select: { comentarios: true } },
         },
       })
+      await registrarAuditoria({
+        tabela: 'forum_topicos',
+        registro_id: topico.id,
+        acao: 'CREATE',
+        descricao: `Tópico "${topico.titulo}" criado no fórum`,
+        dados_novos: topicoComArquivos as any,
+        usuario_id: userId,
+        usuario_nome: userName,
+      })
       return NextResponse.json(topicoComArquivos, { status: 201 })
     }
+
+    await registrarAuditoria({
+      tabela: 'forum_topicos',
+      registro_id: topico.id,
+      acao: 'CREATE',
+      descricao: `Tópico "${topico.titulo}" criado no fórum`,
+      dados_novos: topico as any,
+      usuario_id: userId,
+      usuario_nome: userName,
+    })
 
     return NextResponse.json(topico, { status: 201 })
   } catch (err) {

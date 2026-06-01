@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
+import { pushInspectHistory } from '@/lib/navigation-context'
 
 interface UploadedFile {
   id: string
@@ -92,6 +93,21 @@ export default function TopicoPage() {
   }, [id])
 
   useEffect(() => { load() }, [id])
+
+  useEffect(() => {
+    if (!topico?.id) return
+
+    pushInspectHistory(window.sessionStorage, {
+      path: `/forum/${topico.id}`,
+      inspectId: topico.id,
+      type: 'forum',
+      label: 'Fórum',
+      title: topico.titulo || 'Tópico do fórum',
+      subtitle: topico.autor_nome ? `por ${topico.autor_nome}` : undefined,
+      href: `/forum/${topico.id}`,
+      timestamp: Date.now(),
+    })
+  }, [topico?.id, topico?.titulo, topico?.autor_nome])
 
   // Handlers para Upload de arquivos no Novo Comentário
   function handleFileUploadNovoComentario(file: UploadedFile) {

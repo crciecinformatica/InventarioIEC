@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { registrarAuditoria } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 type Props = { params: Promise<{ id: string }> }
@@ -52,7 +53,26 @@ export async function POST(request: Request, { params }: Props) {
       })
     }
 
-    return NextResponse.json(comentario, { status: 201 })
+    const comentarioCompleto = await prisma.forum_comentarios.findUnique({
+      where: { id: comentario.id },
+      include: {
+        vinculos: true,
+        arquivos: true,
+        reacoes: { select: { usuario_id: true, tipo: true } },
+      },
+    })
+
+    await registrarAuditoria({
+      tabela: 'forum_comentarios',
+      registro_id: comentario.id,
+      acao: 'CREATE',
+      descricao: `Comentário criado no tópico "${topico.titulo}"`,
+      dados_novos: comentarioCompleto as any,
+      usuario_id: userId,
+      usuario_nome: userName,
+    })
+
+    return NextResponse.json(comentarioCompleto ?? comentario, { status: 201 })
   } catch (err) {
     console.error('[POST /api/forum/[id]/comentarios]', err)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

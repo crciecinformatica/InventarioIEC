@@ -9,6 +9,7 @@ import {
   ChevronDown,
   Layers3,
   MapPin,
+  MessageSquare,
   ShieldAlert,
   Users,
 } from 'lucide-react'
@@ -1306,9 +1307,12 @@ export function AuditOverviewPanel({ total, items, activeFilters, isLoading = fa
   const displayedTotal = total || analyzedTotal
   const edits = scopedItems.filter(item => item.acao === 'UPDATE' || item.acao === 'EDITAR_ALOCACAO')
   const deletes = scopedItems.filter(item => item.acao === 'DELETE')
+  const forumItems = scopedItems.filter(item => item.tabela.startsWith('forum_'))
+  const inventoryItems = scopedItems.filter(item => !item.tabela.startsWith('forum_'))
   const latest = latestDate(edits.map(item => item.created_at)) ?? latestDate(scopedItems.map(item => item.created_at))
   const users = groupAuditUsers(edits, edits.length)
-  const actions = groupByLabel(scopedItems, item => ACAO_LABELS[item.acao] || item.acao || 'Sem acao', scopedItems.length)
+  const inventoryActions = groupByLabel(inventoryItems, item => ACAO_LABELS[item.acao] || item.acao || 'Sem acao', inventoryItems.length)
+  const forumActions = groupByLabel(forumItems, item => ACAO_LABELS[item.acao] || item.acao || 'Sem acao', forumItems.length)
   const latestLabel = latest ? formatDate(String(latest)) : '—'
 
   return (
@@ -1319,6 +1323,7 @@ export function AuditOverviewPanel({ total, items, activeFilters, isLoading = fa
       metrics={[
         { icon: <Layers3 className="h-3.5 w-3.5" />, label: 'Registros', value: displayedTotal.toLocaleString('pt-BR'), filter: { kind: 'all' } },
         { icon: <Activity className="h-3.5 w-3.5" />, label: 'Edicoes', value: edits.length.toLocaleString('pt-BR'), tone: 'warning', filter: { kind: 'audit-edits' } },
+        { icon: <MessageSquare className="h-3.5 w-3.5" />, label: 'Fórum', value: forumItems.length.toLocaleString('pt-BR'), tone: 'default', filter: { kind: 'audit-forum', value: 'forum', label: 'Fórum' } },
         { icon: <Users className="h-3.5 w-3.5" />, label: 'Responsaveis', value: users.length.toLocaleString('pt-BR') },
         { icon: <CalendarClock className="h-3.5 w-3.5" />, label: 'Ultima edicao', value: latestLabel },
         { icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'Exclusoes', value: deletes.length.toLocaleString('pt-BR'), tone: deletes.length > 0 ? 'danger' : 'success', filter: { kind: 'audit-action', value: 'DELETE' } },
@@ -1339,10 +1344,25 @@ export function AuditOverviewPanel({ total, items, activeFilters, isLoading = fa
           emptyMessage: 'Sem edicoes por responsavel.',
         },
         {
-          title: 'Acoes mais feitas',
+          title: 'Acoes inventario',
           icon: <Activity className="h-3.5 w-3.5" />,
-          items: actions.map(item => ({ ...item, detail: `${item.detail} · ocorrencias`, filter: { kind: 'audit-action-label', value: item.label } })),
-          emptyMessage: 'Sem dados para compor auditoria.',
+          items: inventoryActions.map(item => ({
+            ...item,
+            detail: `${item.detail} · ocorrencias`,
+            filter: { kind: 'audit-inventory-action-label', value: item.label, label: `Inventário: ${item.label}` },
+          })),
+          emptyMessage: 'Sem ações do inventário registradas.',
+          layout: 'half',
+        },
+        {
+          title: 'Acoes forum',
+          icon: <MessageSquare className="h-3.5 w-3.5" />,
+          items: forumActions.map(item => ({
+            ...item,
+            detail: `${item.detail} · ocorrencias`,
+            filter: { kind: 'audit-forum-action-label', value: item.label, label: `Fórum: ${item.label}`, color: item.color },
+          })),
+          emptyMessage: 'Sem ações do fórum registradas.',
           layout: 'half',
         },
         {

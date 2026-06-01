@@ -8,6 +8,8 @@ export type InspectResourceType =
   | 'rack'
   | 'movimentacao'
   | 'usuario'
+  | 'forum'
+  | 'forum_documentos'
 
 export type InspectContext = {
   path: string
@@ -23,6 +25,7 @@ export type InspectContext = {
 export const INSPECT_CONTEXT_STORAGE_KEY = 'crc:last-inspect-context'
 export const INSPECT_CONTEXT_STACK_STORAGE_KEY = 'crc:inspect-context-stack'
 export const PENDING_INSPECT_PREVIEWS_STORAGE_KEY = 'crc:pending-inspect-previews'
+export const INSPECT_CONTEXT_HISTORY_EVENT = 'crc:inspect-history-updated'
 export const MAX_INSPECT_CONTEXTS = 8
 
 const RESOURCE_BY_PATH: Record<string, { type: InspectResourceType; label: string }> = {
@@ -35,6 +38,8 @@ const RESOURCE_BY_PATH: Record<string, { type: InspectResourceType; label: strin
   '/racks': { type: 'rack', label: 'Rack' },
   '/movimentacoes': { type: 'movimentacao', label: 'Auditoria' },
   '/usuarios': { type: 'usuario', label: 'Usuário' },
+  '/forum': { type: 'forum', label: 'Fórum' },
+  '/forum/documentos': { type: 'forum_documentos', label: 'Documentos' },
 }
 
 export function buildHref(path: string, params: URLSearchParams) {
@@ -190,6 +195,15 @@ export function readInspectHistory(storage: Storage): InspectContext[] {
 export function writeInspectHistory(storage: Storage, history: InspectContext[]) {
   storage.setItem(INSPECT_CONTEXT_STACK_STORAGE_KEY, JSON.stringify(history.slice(0, MAX_INSPECT_CONTEXTS)))
   if (history[0]) writeInspectContext(storage, history[0])
+}
+
+export function pushInspectHistory(storage: Storage, context: InspectContext) {
+  const nextHistory = updateInspectHistory(readInspectHistory(storage), context)
+  writeInspectHistory(storage, nextHistory)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(INSPECT_CONTEXT_HISTORY_EVENT))
+  }
+  return nextHistory
 }
 
 export function clearInspectHistory(storage: Storage) {

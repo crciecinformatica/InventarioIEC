@@ -9,7 +9,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!session) redirect('/login')
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-slate-950">
       <Sidebar />
       {/* pt-14 on mobile to offset fixed top bar; 0 on desktop (sidebar is in flow) */}
       <main className="flex-1 overflow-y-auto min-w-0 pt-14 lg:pt-0">

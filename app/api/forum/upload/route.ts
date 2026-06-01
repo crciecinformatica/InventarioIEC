@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import { v4 as uuidv4 } from 'uuid'
+import { registrarAuditoria } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
     const userId = (session.user as any).id as string
+    const userName = session.user?.name ?? 'Usuário'
     const formData = await request.formData()
     const file = formData.get('file') as File
     const topico_id = formData.get('topico_id') as string | null
@@ -68,6 +70,7 @@ export async function POST(request: Request) {
     const uniqueFileName = `${uuidv4()}.${fileExtension}`
     const parentId = topico_id || comentario_id
     const storagePath = `forum/${parentId}/${uniqueFileName}`
+    const supabase = getSupabase()
 
     // Upload para Supabase Storage
     const buffer = await file.arrayBuffer()
@@ -102,6 +105,16 @@ export async function POST(request: Request) {
         tamanho_bytes: file.size,
         url_publica: publicUrl.publicUrl,
       },
+    })
+
+    await registrarAuditoria({
+      tabela: 'forum_arquivos',
+      registro_id: arquivo.id,
+      acao: 'CREATE',
+      descricao: `Arquivo "${arquivo.nome_original}" enviado ao fórum`,
+      dados_novos: arquivo as any,
+      usuario_id: userId,
+      usuario_nome: userName,
     })
 
     return NextResponse.json(

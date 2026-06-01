@@ -31,6 +31,8 @@ export const TABELA_LABELS: Record<string, string> = {
   forum_topicos: 'Fórum — Tópicos',
   forum_comentarios: 'Fórum — Comentários',
   forum_reacoes: 'Fórum — Reações',
+  forum_arquivos: 'Fórum — Arquivos',
+  forum_pastas: 'Fórum — Pastas',
 }
 
 interface AuditParams {
