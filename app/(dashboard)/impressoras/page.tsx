@@ -54,7 +54,7 @@ function hasMissingPrinterData(item: Impressora) {
 }
 
 export default function ImpressorasPage() {
-  const { isAdmin } = usePermission()
+  const { isAdmin, canRequestInventoryChanges } = usePermission()
   const searchParams = useSearchParams();
 
   const inspectId = searchParams.get("inspect");
@@ -482,7 +482,7 @@ export default function ImpressorasPage() {
   return (
     <div className="p-4 md:p-6 max-w-screen-2xl mx-auto">
       <PageHeader title="Impressoras" total={total}>
-        {isAdmin && (<button type="button" onClick={() => setShowCriar(true)}
+        {(isAdmin || canRequestInventoryChanges) && (<button type="button" onClick={() => setShowCriar(true)}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
           <Plus className="w-4 h-4" /> Nova Impressora
         </button>)}

@@ -338,6 +338,31 @@ model solicitacoes {
   created_at                DateTime? @default(now()) @db.Timestamptz(6)
 }
 
+model solicitacoes_inventario {
+  id                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  status            String    @default("pendente")
+  tipo_recurso      String
+  recurso_id        String?   @db.Uuid
+  acao              String
+  dados_anteriores  Json?
+  dados_propostos   Json?
+  comentarios       Json?
+  solicitante_id    String?   @db.Uuid
+  solicitante_nome  String?
+  revisor_id        String?   @db.Uuid
+  revisor_nome      String?
+  parecer           String?
+  erro_aplicacao    String?
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime? @default(now()) @db.Timestamptz(6)
+  revisado_em       DateTime? @db.Timestamptz(6)
+
+  @@index([status], map: "idx_solicitacoes_inventario_status")
+  @@index([tipo_recurso], map: "idx_solicitacoes_inventario_tipo_recurso")
+  @@index([solicitante_id], map: "idx_solicitacoes_inventario_solicitante")
+  @@index([created_at(sort: Desc)], map: "idx_solicitacoes_inventario_created_at")
+}
+
 model audit_log {
   id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   tabela           String

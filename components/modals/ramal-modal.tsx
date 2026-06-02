@@ -44,7 +44,7 @@ export function RamalModal({ ramal, onClose, onRefresh }: Props) {
     ramal.localidade_id ?? null
   )
   
-  const { isAdmin } = usePermission()
+  const { isAdmin, canRequestInventoryChanges } = usePermission()
 
  const { update, remove, saving, deleting } = useCrud("ramais", () => {
   onRefresh();
@@ -244,7 +244,7 @@ export function RamalModal({ ramal, onClose, onRefresh }: Props) {
      <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex gap-2">
       {mode === "view" ? (
        <>
-{isAdmin && (        <button
+{(isAdmin || canRequestInventoryChanges) && (        <button
          type="button"
          onClick={(e) => {
           e.preventDefault();
@@ -254,7 +254,7 @@ export function RamalModal({ ramal, onClose, onRefresh }: Props) {
         >
          <Trash2 className="w-3.5 h-3.5" /> Excluir
         </button>)}
-{isAdmin && (        <button
+{(isAdmin || canRequestInventoryChanges) && (        <button
          type="button"
          onClick={(e) => {
           e.preventDefault();

@@ -12,6 +12,7 @@ export type AuditAction =
   | 'EDITAR_ALOCACAO'
   | 'APROVAR'
   | 'REJEITAR'
+  | 'RECUSAR'
 
 export const TABELA_LABELS: Record<string, string> = {
   maquinas: 'Máquinas',
@@ -28,6 +29,7 @@ export const TABELA_LABELS: Record<string, string> = {
   alocacoes_ramais: 'Alocações de Ramais',
   usuarios: 'Usuários',
   solicitacoes_usuarios: 'Solicitações de Usuário',
+  solicitacoes_inventario: 'Solicitações de Inventário',
   forum_topicos: 'Fórum — Tópicos',
   forum_comentarios: 'Fórum — Comentários',
   forum_reacoes: 'Fórum — Reações',

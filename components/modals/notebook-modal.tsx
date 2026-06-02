@@ -20,6 +20,7 @@ import { LocalidadeSelect } from "./localidade-select";
 import { formatDate } from "@/lib/utils";
 import { AnimatedDialogFrame } from "@/components/layout/motion-primitives";
 import { DeviceCommentsPopover } from "@/components/forum/device-comments-popover";
+import { useSolicitacaoInventarioConfirm } from "@/components/solicitacoes-inventario/solicitacao-confirm-provider";
 
 const schema = z.object({
  modelo: z.string().optional().nullable(),
@@ -42,7 +43,8 @@ interface Props {
 }
 
 export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
- const { isAdmin } = usePermission();
+ const { isAdmin, canRequestInventoryChanges } = usePermission();
+ const confirmSolicitacao = useSolicitacaoInventarioConfirm()
  const [mode, setMode] = useState<"view" | "edit">("view");
  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
  const [showDesalocarConfirm, setShowDesalocarConfirm] = useState(false);
@@ -99,6 +101,24 @@ export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
   if (!colabId) return;
   setSavingAlocacao(true);
   try {
+   if (!isAdmin) {
+    const solicitacao = await confirmSolicitacao()
+    if (!solicitacao.confirmed) return
+    const res = await fetch('/api/solicitacoes-inventario', {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({
+      tipo_recurso: 'alocacoes_notebooks',
+      acao: 'ALLOCATE',
+      dados_propostos: { notebook_id: notebook.id, colaborador_id: colabId },
+      comentario: solicitacao.comentario,
+     }),
+    })
+    if (!res.ok) throw new Error()
+    toast.success('Solicitação enviada para aprovação.')
+    onClose()
+    return
+   }
    const res = await fetch("/api/alocacoes/notebooks", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -118,6 +138,28 @@ export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
  async function desalocar() {
   setSavingAlocacao(true);
   try {
+   if (!isAdmin) {
+    const activeId = notebook.alocacoes_ativas?.[0]?.id
+    if (!activeId) throw new Error()
+    const solicitacao = await confirmSolicitacao()
+    if (!solicitacao.confirmed) return
+    const res = await fetch('/api/solicitacoes-inventario', {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({
+      tipo_recurso: 'alocacoes_notebooks',
+      recurso_id: activeId,
+      acao: 'DEALLOCATE',
+      dados_anteriores: notebook.alocacoes_ativas?.[0] ?? null,
+      dados_propostos: {},
+      comentario: solicitacao.comentario,
+     }),
+    })
+    if (!res.ok) throw new Error()
+    toast.success('Solicitação enviada para aprovação.')
+    onClose()
+    return
+   }
    const res = await fetch(`/api/alocacoes/notebooks/${notebook.id}/ativo`, {
     method: "DELETE",
    });
@@ -243,7 +285,7 @@ export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
          onClose={onClose}
         />
        ) : (
-        isAdmin && (
+        (isAdmin || canRequestInventoryChanges) && (
         <div className="border border-dashed border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-3">
          <div className="flex items-center gap-2">
           <UserPlus className="w-4 h-4 text-slate-400" />
@@ -304,7 +346,7 @@ export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
           <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
            📦 Emprestado
           </span>
-          {isAdmin && (
+          {(isAdmin || canRequestInventoryChanges) && (
            <button
             type="button"
             onClick={() => salvarEmprestimo(false)}
@@ -336,7 +378,7 @@ export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
          )}
         </div>
        ) : !editandoEmprestimo ? (
-        isAdmin && (
+        (isAdmin || canRequestInventoryChanges) && (
          <button
           type="button"
           onClick={() => setEditandoEmprestimo(true)}
@@ -346,7 +388,7 @@ export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
          </button>
         )
        ) : (
-        isAdmin && (
+        (isAdmin || canRequestInventoryChanges) && (
          <div className="border border-amber-100 dark:border-amber-900 rounded-lg p-4 space-y-3 bg-amber-50/50 dark:bg-amber-950/20">
           <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
            Registrar Empréstimo
@@ -478,7 +520,7 @@ export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
      <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex gap-2">
       {mode === "view" ? (
        <>
-        {isAdmin && (
+        {(isAdmin || canRequestInventoryChanges) && (
          <button
           type="button"
           onClick={(e) => {
@@ -490,7 +532,7 @@ export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
           <Trash2 className="w-3.5 h-3.5" /> Excluir
          </button>
         )}
-        {isAdmin && (
+        {(isAdmin || canRequestInventoryChanges) && (
          <button
           type="button"
           onClick={(e) => {

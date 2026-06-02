@@ -8,6 +8,7 @@ export type InspectResourceType =
   | 'rack'
   | 'movimentacao'
   | 'usuario'
+  | 'pedido'
   | 'forum'
   | 'forum_documentos'
 
@@ -38,6 +39,7 @@ const RESOURCE_BY_PATH: Record<string, { type: InspectResourceType; label: strin
   '/racks': { type: 'rack', label: 'Rack' },
   '/movimentacoes': { type: 'movimentacao', label: 'Auditoria' },
   '/usuarios': { type: 'usuario', label: 'Usuário' },
+  '/pedidos': { type: 'pedido', label: 'Pedido' },
   '/forum': { type: 'forum', label: 'Fórum' },
   '/forum/documentos': { type: 'forum_documentos', label: 'Documentos' },
 }

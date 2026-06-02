@@ -173,6 +173,14 @@ export default function MovimentacoesPage() {
         label: 'Fórum',
         predicate: (item) => item.tabela.startsWith('forum_'),
       },
+      'audit-inventory': {
+        label: 'Inventário',
+        predicate: (item) => !item.tabela.startsWith('forum_') && item.tabela !== 'solicitacoes_inventario',
+      },
+      'audit-inventory-requests': {
+        label: 'Pedidos de inventário',
+        predicate: (item) => item.tabela === 'solicitacoes_inventario',
+      },
       'audit-edits': {
         label: 'Edicoes registradas',
         predicate: (item) => item.acao === 'UPDATE' || item.acao === 'EDITAR_ALOCACAO',
@@ -187,11 +195,15 @@ export default function MovimentacoesPage() {
       },
       'audit-inventory-action-label': {
         label: `Inventário: ${filter.value}`,
-        predicate: (item) => !item.tabela.startsWith('forum_') && item.acao === labelToAction,
+        predicate: (item) => !item.tabela.startsWith('forum_') && item.tabela !== 'solicitacoes_inventario' && item.acao === labelToAction,
       },
       'audit-forum-action-label': {
         label: `Fórum: ${filter.value}`,
         predicate: (item) => item.tabela.startsWith('forum_') && item.acao === labelToAction,
+      },
+      'audit-inventory-request-action-label': {
+        label: `Pedidos: ${filter.value}`,
+        predicate: (item) => item.tabela === 'solicitacoes_inventario' && item.acao === labelToAction,
       },
       'audit-user': {
         label: filter.label ?? `Responsavel: ${filter.value ?? 'Sem responsavel'}`,

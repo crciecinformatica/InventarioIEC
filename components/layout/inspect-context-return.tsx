@@ -70,17 +70,12 @@ function getSideSheetReturnPosition() {
   }
 }
 
-function getFloatingStackPosition(sideSheetOpen: boolean): FloatingStackPosition {
-  if (sideSheetOpen) return getSideSheetReturnPosition()
-
-  return {
-    bottom: getBottomRightOccupiedOffset(BASE_BOTTOM_OFFSET),
-    right: BASE_BOTTOM_OFFSET,
-  }
+function getFloatingStackPosition(): FloatingStackPosition {
+  return getSideSheetReturnPosition()
 }
 
-function useFloatingStackPosition(sideSheetOpen: boolean) {
-  const [position, setPosition] = useState<FloatingStackPosition>(() => getFloatingStackPosition(sideSheetOpen))
+function useFloatingStackPosition() {
+  const [position, setPosition] = useState<FloatingStackPosition>(() => getFloatingStackPosition())
 
   useEffect(() => {
     let frame = 0
@@ -94,7 +89,7 @@ function useFloatingStackPosition(sideSheetOpen: boolean) {
     }
 
     function readPosition() {
-      setPosition(getFloatingStackPosition(sideSheetOpen))
+      setPosition(getFloatingStackPosition())
     }
 
     function scheduleRead(delay = 0) {
@@ -137,7 +132,7 @@ function useFloatingStackPosition(sideSheetOpen: boolean) {
       observer.disconnect()
       window.removeEventListener('resize', update)
     }
-  }, [sideSheetOpen])
+  }, [])
 
   return position
 }
@@ -151,11 +146,8 @@ export function InspectContextReturn() {
   const [open, setOpen] = useState(false)
   const searchString = searchParams.toString()
   const currentHref = `${pathname}${searchString ? `?${searchString}` : ''}`
-  const sideSheetOpen = (
-    searchParams.has('inspect') &&
-    (pathname === '/colaboradores' || pathname === '/impressoras' || pathname === '/racks' || pathname === '/movimentacoes')
-  )
-  const floatingPosition = useFloatingStackPosition(sideSheetOpen)
+  const floatingPosition = useFloatingStackPosition()
+  const avoidingSideSheet = floatingPosition.right > BASE_BOTTOM_OFFSET
 
   useEffect(() => {
     const href = `${pathname}${searchString ? `?${searchString}` : ''}`
@@ -190,7 +182,7 @@ export function InspectContextReturn() {
   const primary = options[0]
 
   useEffect(() => {
-    if (!visible || sideSheetOpen) {
+    if (!visible || avoidingSideSheet) {
       document.documentElement.style.removeProperty('--crc-sonner-bottom')
       return
     }
@@ -214,7 +206,7 @@ export function InspectContextReturn() {
       window.removeEventListener('resize', updateSonnerStackReserve)
       document.documentElement.style.removeProperty('--crc-sonner-bottom')
     }
-  }, [floatingPosition.bottom, sideSheetOpen, visible])
+  }, [avoidingSideSheet, floatingPosition.bottom, visible])
 
   useEffect(() => {
     if (!open) return

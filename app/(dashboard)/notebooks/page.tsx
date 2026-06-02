@@ -65,7 +65,7 @@ function hasMissingNotebookData(item: Notebook) {
 }
 
 export default function NotebooksPage() {
-  const { isAdmin } = usePermission();
+  const { isAdmin, canRequestInventoryChanges } = usePermission();
 
   const searchParams = useSearchParams();
   const inspectId = searchParams.get("inspect");
@@ -750,7 +750,7 @@ export default function NotebooksPage() {
         title="Notebooks"
         total={total}
       >
-        {isAdmin && (
+        {(isAdmin || canRequestInventoryChanges) && (
           <button
             type="button"
             onClick={() =>

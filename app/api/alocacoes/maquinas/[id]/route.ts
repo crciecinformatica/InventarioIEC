@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, requireAdmin } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { registrarAuditoria, getAuditSession } from '@/lib/audit'
 
@@ -9,6 +9,9 @@ type Props = { params: Promise<{ id: string }> }
 
 // DELETE /api/alocacoes/maquinas/[alocacao_id] — desativa alocação específica
 export async function DELETE(request: Request, { params }: Props) {
+  const denied = await requireAdmin()
+  if (denied) return denied
+
   try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })

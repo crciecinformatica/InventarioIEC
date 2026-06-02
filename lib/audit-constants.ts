@@ -21,6 +21,7 @@ export const ACAO_COLORS: Record<string, string> = {
   EDITAR_ALOCACAO: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
   APROVAR:         'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
   REJEITAR:        'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300',
+  RECUSAR:         'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300',
 }
 
 export const ACAO_LABELS: Record<string, string> = {
@@ -32,6 +33,7 @@ export const ACAO_LABELS: Record<string, string> = {
   EDITAR_ALOCACAO: 'Edição de Alocação',
   APROVAR:         'Aprovação',
   REJEITAR:        'Rejeição',
+  RECUSAR:         'Recusa',
 }
 
 export const TABELAS_OPCOES = [
@@ -45,6 +47,7 @@ export const TABELAS_OPCOES = [
   { value: 'movimentacoes',       label: 'Movimentações' },
   { value: 'usuarios',            label: 'Usuários' },
   { value: 'solicitacoes_usuarios', label: 'Solicitações de Usuário' },
+  { value: 'solicitacoes_inventario', label: 'Solicitações de Inventário' },
   { value: 'forum',               label: 'Fórum — Todos' },
   { value: 'forum_topicos',       label: 'Fórum — Tópicos' },
   { value: 'forum_comentarios',   label: 'Fórum — Comentários' },

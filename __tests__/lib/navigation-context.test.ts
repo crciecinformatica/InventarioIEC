@@ -37,7 +37,12 @@ describe('navigation-context', () => {
 
   test('ignora rotas sem inspect ou fora do inventario inspecionavel', () => {
     expect(createInspectContext('/colaboradores', 'setor_id=123')).toBeNull()
-    expect(createInspectContext('/usuarios', 'inspect=abc')).toBeNull()
+    expect(createInspectContext('/usuarios', 'inspect=abc')).toMatchObject({
+      path: '/usuarios',
+      inspectId: 'abc',
+      type: 'usuario',
+      label: 'Usuário',
+    })
   })
 
   test('monta href preservando filtros e trocando apenas inspect', () => {

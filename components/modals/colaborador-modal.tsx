@@ -37,7 +37,7 @@ interface Props {
 type Tab = "info" | "alocacoes" | "historico";
 
 export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
- const { isAdmin } = usePermission();
+ const { isAdmin, canRequestInventoryChanges } = usePermission();
  const router = useRouter();
  const [mode, setMode] = useState<"view" | "edit">("view");
  const [tab, setTab] = useState<Tab>("info");
@@ -312,7 +312,7 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
      <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex gap-2">
       {mode === "view" ? (
        <>
-        {isAdmin && (
+        {(isAdmin || canRequestInventoryChanges) && (
          <button
           type="button"
           onClick={handleClickInativar}
@@ -327,7 +327,7 @@ export function ColaboradorModal({ colaborador, onClose, onRefresh }: Props) {
           Inativar
          </button>
         )}
-        {isAdmin && (
+        {(isAdmin || canRequestInventoryChanges) && (
          <button
           type="button"
           onClick={(e) => {

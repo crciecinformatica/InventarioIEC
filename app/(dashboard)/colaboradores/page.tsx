@@ -46,7 +46,7 @@ const columns: ColumnDef<Colaborador>[] = [
 export default function ColaboradoresPage() {
   const searchParams = useSearchParams()
   const inspectId = searchParams.get('inspect')
-  const { isAdmin } = usePermission()
+  const { isAdmin, canRequestInventoryChanges } = usePermission()
   const [data, setData] = useState<Colaborador[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -289,7 +289,7 @@ export default function ColaboradoresPage() {
   return (
     <div className="p-4 md:p-6 max-w-screen-2xl mx-auto">
       <PageHeader title="Colaboradores" total={total}>
-        {isAdmin && (<button type="button" onClick={() => setShowCriar(true)}
+        {(isAdmin || canRequestInventoryChanges) && (<button type="button" onClick={() => setShowCriar(true)}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
           <Plus className="w-4 h-4" /> Novo colaborador
         </button>)}

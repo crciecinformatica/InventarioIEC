@@ -7,6 +7,7 @@ import {
   CalendarClock,
   CheckCircle2,
   ChevronDown,
+  GitPullRequest,
   Layers3,
   MapPin,
   MessageSquare,
@@ -1308,11 +1309,13 @@ export function AuditOverviewPanel({ total, items, activeFilters, isLoading = fa
   const edits = scopedItems.filter(item => item.acao === 'UPDATE' || item.acao === 'EDITAR_ALOCACAO')
   const deletes = scopedItems.filter(item => item.acao === 'DELETE')
   const forumItems = scopedItems.filter(item => item.tabela.startsWith('forum_'))
-  const inventoryItems = scopedItems.filter(item => !item.tabela.startsWith('forum_'))
+  const requestItems = scopedItems.filter(item => item.tabela === 'solicitacoes_inventario')
+  const inventoryItems = scopedItems.filter(item => !item.tabela.startsWith('forum_') && item.tabela !== 'solicitacoes_inventario')
   const latest = latestDate(edits.map(item => item.created_at)) ?? latestDate(scopedItems.map(item => item.created_at))
   const users = groupAuditUsers(edits, edits.length)
   const inventoryActions = groupByLabel(inventoryItems, item => ACAO_LABELS[item.acao] || item.acao || 'Sem acao', inventoryItems.length)
   const forumActions = groupByLabel(forumItems, item => ACAO_LABELS[item.acao] || item.acao || 'Sem acao', forumItems.length)
+  const requestActions = groupByLabel(requestItems, item => ACAO_LABELS[item.acao] || item.acao || 'Sem acao', requestItems.length)
   const latestLabel = latest ? formatDate(String(latest)) : '—'
 
   return (
@@ -1323,7 +1326,9 @@ export function AuditOverviewPanel({ total, items, activeFilters, isLoading = fa
       metrics={[
         { icon: <Layers3 className="h-3.5 w-3.5" />, label: 'Registros', value: displayedTotal.toLocaleString('pt-BR'), filter: { kind: 'all' } },
         { icon: <Activity className="h-3.5 w-3.5" />, label: 'Edicoes', value: edits.length.toLocaleString('pt-BR'), tone: 'warning', filter: { kind: 'audit-edits' } },
+        { icon: <Activity className="h-3.5 w-3.5" />, label: 'Inventário', value: inventoryItems.length.toLocaleString('pt-BR'), tone: 'default', filter: { kind: 'audit-inventory', value: 'inventory', label: 'Inventário' } },
         { icon: <MessageSquare className="h-3.5 w-3.5" />, label: 'Fórum', value: forumItems.length.toLocaleString('pt-BR'), tone: 'default', filter: { kind: 'audit-forum', value: 'forum', label: 'Fórum' } },
+        { icon: <GitPullRequest className="h-3.5 w-3.5" />, label: 'Pedidos', value: requestItems.length.toLocaleString('pt-BR'), tone: 'default', filter: { kind: 'audit-inventory-requests', value: 'solicitacoes_inventario', label: 'Pedidos de inventário' } },
         { icon: <Users className="h-3.5 w-3.5" />, label: 'Responsaveis', value: users.length.toLocaleString('pt-BR') },
         { icon: <CalendarClock className="h-3.5 w-3.5" />, label: 'Ultima edicao', value: latestLabel },
         { icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'Exclusoes', value: deletes.length.toLocaleString('pt-BR'), tone: deletes.length > 0 ? 'danger' : 'success', filter: { kind: 'audit-action', value: 'DELETE' } },
@@ -1363,6 +1368,17 @@ export function AuditOverviewPanel({ total, items, activeFilters, isLoading = fa
             filter: { kind: 'audit-forum-action-label', value: item.label, label: `Fórum: ${item.label}`, color: item.color },
           })),
           emptyMessage: 'Sem ações do fórum registradas.',
+          layout: 'half',
+        },
+        {
+          title: 'Pedidos inventario',
+          icon: <GitPullRequest className="h-3.5 w-3.5" />,
+          items: requestActions.map(item => ({
+            ...item,
+            detail: `${item.detail} · pedidos`,
+            filter: { kind: 'audit-inventory-request-action-label', value: item.label, label: `Pedidos: ${item.label}`, color: item.color },
+          })),
+          emptyMessage: 'Sem pedidos de inventário registrados.',
           layout: 'half',
         },
         {
