@@ -43,7 +43,11 @@ export function CriarMaquinaModal({ onClose, onRefresh }: Props) {
     const maquina = await create({ ...data, setor_id: setorId, localidade_id: localidadeId })
     if (!maquina) return
 
-    console.log(maquina)
+    if ((maquina as any).__solicitacaoInventario) {
+      onRefresh()
+      onClose()
+      return
+    }
 
     if (colabId) {
       setSavingAlocacao(true)

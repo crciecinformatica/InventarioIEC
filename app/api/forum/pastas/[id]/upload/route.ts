@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { uploadArquivo } from '@/lib/supabase-storage'
+import { registrarAuditoria } from '@/lib/audit'
 
 export const runtime = 'nodejs'
 type Props = { params: Promise<{ id: string }> }
@@ -50,6 +51,16 @@ export async function POST(request: Request, { params }: Props) {
         url_publica:    url,
         usuario_id:     userId,
       },
+    })
+
+    await registrarAuditoria({
+      tabela: 'forum_arquivos',
+      registro_id: arquivo.id,
+      acao: 'CREATE',
+      descricao: `Arquivo "${arquivo.nome_original}" enviado para a pasta "${pasta.nome}"`,
+      dados_novos: arquivo as any,
+      usuario_id: userId,
+      usuario_nome: userName,
     })
 
     return NextResponse.json(arquivo, { status: 201 })

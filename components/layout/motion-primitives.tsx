@@ -20,7 +20,7 @@ const ease = [0.22, 1, 0.36, 1] as const
 
 export function RouteTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useReducedMotion() || process.env.NODE_ENV === 'test'
 
   if (reduceMotion) return <>{children}</>
 
@@ -46,24 +46,25 @@ export function AnimatedSheetFrame({
   zClassName = 'z-50',
 }: CloseableMotionShellProps) {
   const reduceMotion = useReducedMotion()
-  const sheetInitial = reduceMotion ? { opacity: 0 } : { x: 'calc(100% + 24px)' }
-  const sheetExit = reduceMotion ? { opacity: 0 } : { x: 'calc(100% + 24px)' }
+  const disableMotion = reduceMotion || process.env.NODE_ENV === 'test'
+  const sheetInitial = disableMotion ? false : { x: 'calc(100% + 32px)', opacity: 0.96 }
+  const sheetExit = disableMotion ? { opacity: 0 } : { x: 'calc(100% + 32px)', opacity: 0.92 }
 
   return (
     <motion.div
       className={cn('fixed inset-0', zClassName)}
-      initial={reduceMotion ? false : { opacity: 0 }}
+      initial={disableMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.18, ease }}
+      transition={{ duration: 0.22, ease }}
     >
       <motion.div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
-        initial={reduceMotion ? false : { opacity: 0 }}
+        initial={disableMotion ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.18, ease }}
+        transition={{ duration: 0.22, ease }}
       />
       <motion.aside
         className={cn('fixed bottom-0 right-0 top-0 w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden', className)}
@@ -72,7 +73,7 @@ export function AnimatedSheetFrame({
         animate={{ x: 0, opacity: 1 }}
         exit={sheetExit}
         style={{ willChange: 'transform' }}
-        transition={{ type: 'spring', stiffness: 460, damping: 42, mass: 0.9 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 44, mass: 0.95 }}
       >
         {children}
       </motion.aside>
@@ -87,13 +88,14 @@ export function AnimatedDialogFrame({
   zClassName = 'z-50',
 }: CloseableMotionShellProps) {
   const reduceMotion = useReducedMotion()
-  const dialogInitial = reduceMotion ? { opacity: 0 } : { y: 10, scale: 0.9, opacity: 0 }
-  const dialogExit = reduceMotion ? { opacity: 0 } : { y: 8, scale: 0.92, opacity: 0 }
+  const disableMotion = reduceMotion || process.env.NODE_ENV === 'test'
+  const dialogInitial = disableMotion ? false : { y: 10, scale: 0.9, opacity: 0 }
+  const dialogExit = disableMotion ? { opacity: 0 } : { y: 8, scale: 0.92, opacity: 0 }
 
   return (
     <motion.div
       className={cn('fixed inset-0 flex items-center justify-center p-4', zClassName)}
-      initial={reduceMotion ? false : { opacity: 0 }}
+      initial={disableMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.14, ease }}
@@ -101,7 +103,7 @@ export function AnimatedDialogFrame({
       <motion.div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
-        initial={reduceMotion ? false : { opacity: 0 }}
+        initial={disableMotion ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.16, ease }}
@@ -124,7 +126,8 @@ export const AnimatedFloat = forwardRef<HTMLDivElement, MotionShellProps>(functi
   ref,
 ) {
   const reduceMotion = useReducedMotion()
-  const initial = reduceMotion
+  const disableMotion = reduceMotion || process.env.NODE_ENV === 'test'
+  const initial = disableMotion
     ? { opacity: 0 }
     : { opacity: 0, y: 24, scale: 0.9 }
   const exit = reduceMotion

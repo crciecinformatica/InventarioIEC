@@ -19,6 +19,7 @@ import { ColaboradorSelect } from '@/components/modals/colaborador-select'
 import { ConfirmDialog } from '@/components/modals/confirm-dialog'
 import { formatDate } from '@/lib/utils'
 import { writePendingInspectPreview } from '@/lib/navigation-context'
+import { useSolicitacaoInventarioConfirm } from '@/components/solicitacoes-inventario/solicitacao-confirm-provider'
 
 interface AlocacaoItem {
   id: string
@@ -42,7 +43,8 @@ export function AlocacoesAtivasSection({
   alocacoes,
   onRefresh,
 }: Props) {
-  const { isAdmin } = usePermission()
+  const { isAdmin, canRequestInventoryChanges } = usePermission()
+  const confirmSolicitacao = useSolicitacaoInventarioConfirm()
   const router = useRouter()
   const [novoColabId, setNovoColabId] = useState('')
   const [novoColabNome, setNovoColabNome] = useState('')
@@ -77,6 +79,25 @@ export function AlocacoesAtivasSection({
         aparelhos: { aparelho_id: itemId, colaborador_id: novoColabId },
         ramais:    { ramal_id:    itemId, colaborador_id: novoColabId },
       }
+      if (!isAdmin) {
+        const solicitacao = await confirmSolicitacao()
+        if (!solicitacao.confirmed) return
+        const res = await fetch('/api/solicitacoes-inventario', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipo_recurso: `alocacoes_${entidade}`,
+            acao: 'ALLOCATE',
+            dados_propostos: bodyMap[entidade],
+            comentario: solicitacao.comentario,
+          }),
+        })
+        if (!res.ok) throw new Error()
+        toast.success('Solicitação enviada para aprovação.')
+        setNovoColabId('')
+        setNovoColabNome('')
+        return
+      }
       const res = await fetch(`/api/alocacoes/${entidade}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -98,6 +119,26 @@ export function AlocacoesAtivasSection({
   async function desalocar(alocacaoId: string) {
     setDesalocandoId(alocacaoId)
     try {
+      if (!isAdmin) {
+        const previous = alocacoes.find(aloc => aloc.id === alocacaoId) ?? null
+        const solicitacao = await confirmSolicitacao()
+        if (!solicitacao.confirmed) return
+        const res = await fetch('/api/solicitacoes-inventario', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipo_recurso: `alocacoes_${entidade}`,
+            recurso_id: alocacaoId,
+            acao: 'DEALLOCATE',
+            dados_anteriores: previous,
+            dados_propostos: {},
+            comentario: solicitacao.comentario,
+          }),
+        })
+        if (!res.ok) throw new Error()
+        toast.success('Solicitação enviada para aprovação.')
+        return
+      }
       const res = await fetch(`/api/alocacoes/${entidade}/${alocacaoId}`, {
         method: 'DELETE',
       })
@@ -116,6 +157,27 @@ export function AlocacoesAtivasSection({
   async function salvarWhatsapp(alocacaoId: string) {
     setSavingWhatsapp(true)
     try {
+      if (!isAdmin) {
+        const previous = alocacoes.find(aloc => aloc.id === alocacaoId) ?? null
+        const solicitacao = await confirmSolicitacao()
+        if (!solicitacao.confirmed) return
+        const res = await fetch('/api/solicitacoes-inventario', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tipo_recurso: 'alocacoes_ramais',
+            recurso_id: alocacaoId,
+            acao: 'CORRECTION',
+            dados_anteriores: previous,
+            dados_propostos: { whatsapp: novoWhatsapp },
+            comentario: solicitacao.comentario,
+          }),
+        })
+        if (!res.ok) throw new Error()
+        toast.success('Solicitação enviada para aprovação.')
+        setEditandoWhatsappId(null)
+        return
+      }
       const res = await fetch(`/api/alocacoes/${entidade}/${alocacaoId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -213,7 +275,7 @@ export function AlocacoesAtivasSection({
                         </span>
                       </span>
                     </button>
-                    {isAdmin && (
+                    {(isAdmin || canRequestInventoryChanges) && (
                       <button
                         type="button"
                         onClick={() => setConfirmDesalocar(aloc)}
@@ -237,7 +299,7 @@ export function AlocacoesAtivasSection({
               </div>
 
               {/* Edição de WhatsApp para ramais — apenas admin */}
-              {isAdmin && entidade === 'ramais' && editandoWhatsappId === aloc.id ? (
+              {(isAdmin || canRequestInventoryChanges) && entidade === 'ramais' && editandoWhatsappId === aloc.id ? (
                 <div className="flex items-center gap-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900 px-3 py-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -271,7 +333,7 @@ export function AlocacoesAtivasSection({
                     Cancelar
                   </button>
                 </div>
-              ) : isAdmin && entidade === 'ramais' ? (
+              ) : (isAdmin || canRequestInventoryChanges) && entidade === 'ramais' ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -290,7 +352,7 @@ export function AlocacoesAtivasSection({
       )}
 
       {/* Adicionar nova alocação — apenas admin */}
-      {isAdmin && <div className="border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2 bg-slate-50/60 dark:bg-slate-900/40">
+      {(isAdmin || canRequestInventoryChanges) && <div className="border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2 bg-slate-50/60 dark:bg-slate-900/40">
         <div className="flex items-center gap-2">
           <UserPlus className="w-3.5 h-3.5 text-slate-400" />
           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">

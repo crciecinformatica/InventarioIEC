@@ -31,7 +31,7 @@ type ActiveOverviewFilter = OverviewFilter & {
 };
 
 export default function RacksPage() {
-  const { isAdmin } = usePermission();
+  const { isAdmin, canRequestInventoryChanges } = usePermission();
   const searchParams = useSearchParams();
   const inspectId = searchParams.get("inspect");
 
@@ -484,7 +484,7 @@ export default function RacksPage() {
   return (
     <div className="p-4 md:p-6 max-w-screen-2xl mx-auto">
       <PageHeader title="Racks" total={tableTotal}>
-        {isAdmin && (
+        {(isAdmin || canRequestInventoryChanges) && (
           <button
             type="button"
             onClick={() => setShowCriar(true)}

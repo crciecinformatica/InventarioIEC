@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import { VinculosSection } from '@/components/forum/vinculos-section'
 import { Search, Plus, MessageSquare, Eye, Pin, Lock } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { pushInspectHistory } from '@/lib/navigation-context'
 
 export default function ForumPage() {
   const [data, setData]     = useState<any[]>([])
@@ -38,6 +39,19 @@ export default function ForumPage() {
 
     return () => { cancelledRef.current = true }
   }, [page, search, filtro, refreshKey])
+
+  useEffect(() => {
+    pushInspectHistory(window.sessionStorage, {
+      path: '/forum',
+      inspectId: 'forum',
+      type: 'forum',
+      label: 'Fórum',
+      title: 'Fórum',
+      subtitle: 'Discussões e soluções do setor de TI',
+      href: '/forum',
+      timestamp: Date.now(),
+    })
+  }, [])
 
   const inputCls = "px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
   const filtros = ['todos', 'fixados', 'meus', 'vinculados']

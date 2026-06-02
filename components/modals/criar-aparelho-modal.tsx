@@ -39,6 +39,11 @@ export function CriarAparelhoModal({ onClose, onRefresh }: Props) {
   async function onSubmit(data: FormData) {
     const aparelho = await create({ ...data, setor_id: setorId, localidade_id: localidadeId })
     if (!aparelho) return
+    if ((aparelho as any).__solicitacaoInventario) {
+      onRefresh()
+      onClose()
+      return
+    }
 
     if (colabId) {
       setSavingAlocacao(true)

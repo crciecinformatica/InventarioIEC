@@ -8,7 +8,9 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
+import { pushInspectHistory } from '@/lib/navigation-context'
 
 interface Pasta {
   id: string
@@ -50,13 +52,16 @@ function getFileIcon(mime?: string | null) {
 
 export default function DocumentosPage() {
   const { data: session } = useSession()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pastaParam = searchParams.get('pasta')
   const perfil = (session?.user as any)?.perfil as string
   const isAdmin = perfil === 'admin'
 
   const [pastas, setPastas]         = useState<Pasta[]>([])
   const [arquivos, setArquivos]     = useState<Arquivo[]>([])
   const [breadcrumb, setBreadcrumb] = useState<{ id: string; nome: string }[]>([])
-  const [currentId, setCurrentId]   = useState<string | null>(null)
+  const [currentId, setCurrentId]   = useState<string | null>(pastaParam)
   const [loading, setLoading]       = useState(true)
 
   // Modais
@@ -92,10 +97,31 @@ export default function DocumentosPage() {
     finally { setLoading(false) }
   }, [currentId])
 
+  useEffect(() => {
+    setCurrentId(pastaParam)
+  }, [pastaParam])
+
   useEffect(() => { load(currentId) }, [currentId])
 
+  useEffect(() => {
+    const currentFolder = currentId ? breadcrumb[breadcrumb.length - 1] : null
+    const href = currentId ? `/forum/documentos?pasta=${currentId}` : '/forum/documentos'
+
+    pushInspectHistory(window.sessionStorage, {
+      path: '/forum/documentos',
+      inspectId: currentId ?? 'documentos',
+      type: 'forum_documentos',
+      label: 'Documentos',
+      title: currentFolder?.nome ?? 'Documentos',
+      subtitle: currentId ? 'Pasta do fórum' : 'Arquivos e tutoriais do setor de TI',
+      href,
+      timestamp: Date.now(),
+    })
+  }, [breadcrumb, currentId])
+
   function navigate(id: string | null) {
-    setCurrentId(id)
+    const href = id ? `/forum/documentos?pasta=${id}` : '/forum/documentos'
+    router.push(href, { scroll: false })
   }
 
   // Criar pasta
@@ -185,7 +211,7 @@ export default function DocumentosPage() {
     } catch { toast.error('Erro ao remover.') }
   }
 
-  const inp = "w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const inp = "w-full px-3 py-2 text-sm border border-slate-700 rounded-lg bg-slate-800 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -193,15 +219,15 @@ export default function DocumentosPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Documentos</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <h1 className="text-xl font-bold text-white">Documentos</h1>
+          <p className="mt-0.5 text-xs text-slate-400">
             Arquivos e tutoriais do setor de TI
           </p>
         </div>
         <div className="flex gap-2">
           {isAdmin && (
             <button type="button" onClick={() => { setShowNovaPasta(true); setEditandoPasta(null); setNovaNome(''); setNovaDesc(''); setNovaCor('#3b82f6') }}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+              className="flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800">
               <FolderPlus className="w-4 h-4" /> Nova pasta
             </button>
           )}
@@ -217,14 +243,14 @@ export default function DocumentosPage() {
       {/* Breadcrumb */}
       <div className="flex items-center gap-1 text-sm mb-4 flex-wrap">
         <button type="button" onClick={() => navigate(null)}
-          className="flex items-center gap-1 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition">
+          className="flex items-center gap-1 text-slate-500 transition hover:text-blue-400">
           <Home className="w-3.5 h-3.5" /> Início
         </button>
         {breadcrumb.map(b => (
           <span key={b.id} className="flex items-center gap-1">
-            <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
+            <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
             <button type="button" onClick={() => navigate(b.id)}
-              className="text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition">
+              className="text-slate-500 transition hover:text-blue-400">
               {b.nome}
             </button>
           </span>
@@ -235,7 +261,7 @@ export default function DocumentosPage() {
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="h-24 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-800" />
           ))}
         </div>
       ) : pastas.length === 0 && arquivos.length === 0 ? (
@@ -254,23 +280,23 @@ export default function DocumentosPage() {
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                 Pastas ({pastas.length})
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {pastas.map(pasta => (
                   <div key={pasta.id} className="group relative">
                     <button type="button" onDoubleClick={() => navigate(pasta.id)}
                       onClick={() => navigate(pasta.id)}
-                      className="w-full flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-200 dark:hover:border-slate-700 hover:shadow-sm transition text-center">
-                      <div className="relative">
-                        <Folder className="w-12 h-12" style={{ color: pasta.cor ?? '#3b82f6' }} />
-                        {(pasta._count.filhos + pasta._count.arquivos) > 0 && (
-                          <span className="absolute -bottom-1 -right-1 text-[9px] font-bold bg-white dark:bg-slate-900 rounded-full px-1 text-slate-400 border border-slate-100 dark:border-slate-800">
-                            {pasta._count.filhos + pasta._count.arquivos}
-                          </span>
-                        )}
+                      className="relative flex aspect-[1.28] w-full flex-col items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 p-4 text-center transition hover:border-slate-700 hover:shadow-sm">
+                      {(pasta._count.filhos + pasta._count.arquivos) > 0 && (
+                        <span className="absolute right-2 top-2 rounded-full border border-slate-800 bg-slate-950 px-1.5 py-0.5 text-[10px] font-bold text-slate-400">
+                          {pasta._count.filhos + pasta._count.arquivos}
+                        </span>
+                      )}
+                      <div className="flex h-12 w-12 items-center justify-center">
+                        <Folder className="h-10 w-10" style={{ color: pasta.cor ?? '#3b82f6' }} />
                       </div>
-                      <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate w-full">{pasta.nome}</span>
+                      <span className="block w-full truncate text-xs font-medium text-slate-300">{pasta.nome}</span>
                       {pasta.descricao && (
-                        <span className="text-[10px] text-slate-400 truncate w-full">{pasta.descricao}</span>
+                        <span className="block w-full truncate text-[10px] text-slate-400">{pasta.descricao}</span>
                       )}
                     </button>
                     {isAdmin && (
@@ -282,13 +308,13 @@ export default function DocumentosPage() {
                           setNovaDesc(pasta.descricao ?? '')
                           setNovaCor(pasta.cor ?? '#3b82f6')
                           setShowNovaPasta(true)
-                        }} className="p-1 rounded-md bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-400 hover:text-blue-500 transition shadow-sm">
+                        }} className="rounded-md border border-slate-700 bg-slate-800 p-1 text-slate-400 shadow-sm transition hover:text-blue-500">
                           <Pencil className="w-3 h-3" />
                         </button>
                         <button type="button" onClick={e => {
                           e.stopPropagation()
                           setConfirmDelete({ tipo: 'pasta', id: pasta.id, nome: pasta.nome })
-                        }} className="p-1 rounded-md bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-400 hover:text-red-500 transition shadow-sm">
+                        }} className="rounded-md border border-slate-700 bg-slate-800 p-1 text-slate-400 shadow-sm transition hover:text-red-500">
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
@@ -305,31 +331,31 @@ export default function DocumentosPage() {
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                 Arquivos ({arquivos.length})
               </p>
-              <div className="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
+              <div className="overflow-hidden rounded-xl border border-slate-800">
                 {/* Header */}
-                <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_100px] gap-4 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                  <span>Nome</span>
-                  <span>Enviado por</span>
-                  <span>Data</span>
-                  <span>Tamanho</span>
+                <div className="hidden grid-cols-12 gap-4 bg-slate-800/50 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:grid">
+                  <span className="col-span-6">Nome</span>
+                  <span className="col-span-2">Enviado por</span>
+                  <span className="col-span-2">Data</span>
+                  <span className="col-span-2">Tamanho</span>
                 </div>
                 {arquivos.map((arq, i) => (
                   <div key={arq.id}
-                    className={`grid grid-cols-[minmax(0,2fr)_1fr_1fr_100px] gap-4 px-4 py-3 items-center border-t border-slate-50 dark:border-slate-800 group ${i % 2 === 1 ? 'bg-slate-50/40 dark:bg-slate-800/20' : ''}`}>
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    className={`group grid gap-2 border-t border-slate-800 px-4 py-3 md:grid-cols-12 md:items-center md:gap-4 ${i % 2 === 1 ? 'bg-slate-800/20' : ''}`}>
+                    <div className="flex min-w-0 items-center gap-2.5 md:col-span-6">
                       {getFileIcon(arq.tipo_arquivo)}
                       <div className="min-w-0">
                         <a href={arq.url_publica} target="_blank" rel="noopener noreferrer"
-                          className="text-sm font-medium text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 transition truncate block">
+                          className="block truncate text-sm font-medium text-slate-200 transition hover:text-blue-400">
                           {arq.nome_original}
                         </a>
                       </div>
                     </div>
-                    <span className="text-xs text-slate-500 truncate">{arq.usuario_id}</span>
-                    <span className="text-xs text-slate-400">{formatDate(arq.created_at)}</span>
-                    <div className="flex items-center justify-between">
+                    <span className="truncate text-xs text-slate-500 md:col-span-2">{arq.usuario_id}</span>
+                    <span className="text-xs text-slate-400 md:col-span-2">{formatDate(arq.created_at)}</span>
+                    <div className="flex items-center justify-between md:col-span-2">
                       <span className="text-xs text-slate-400">{formatSize(arq.tamanho_bytes)}</span>
-                      <div className="hidden group-hover:flex gap-1">
+                      <div className="flex gap-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
                         <a href={arq.url_publica} download target="_blank" rel="noopener noreferrer"
                           className="p-1 rounded text-slate-400 hover:text-blue-500 transition">
                           <Download className="w-3.5 h-3.5" />
@@ -352,21 +378,21 @@ export default function DocumentosPage() {
       {showNovaPasta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowNovaPasta(false); setEditandoPasta(null) }} />
-          <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-100 dark:border-slate-800">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-4">
+          <div className="relative mx-4 w-full max-w-sm rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-4 text-base font-semibold text-white">
               {editandoPasta ? 'Editar pasta' : 'Nova pasta'}
             </h2>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Nome *</label>
+                <label className="mb-1 block text-xs font-medium text-slate-400">Nome *</label>
                 <input value={novaNome} onChange={e => setNovaNome(e.target.value)} className={inp} placeholder="Ex: Tutoriais" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Descrição</label>
+                <label className="mb-1 block text-xs font-medium text-slate-400">Descrição</label>
                 <input value={novaDesc} onChange={e => setNovaDesc(e.target.value)} className={inp} placeholder="Opcional" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Cor</label>
+                <label className="mb-2 block text-xs font-medium text-slate-400">Cor</label>
                 <div className="flex gap-2 flex-wrap">
                   {COR_OPTIONS.map(cor => (
                     <button key={cor} type="button" onClick={() => setNovaCor(cor)}
@@ -378,7 +404,7 @@ export default function DocumentosPage() {
             </div>
             <div className="flex gap-2 mt-5">
               <button type="button" onClick={() => { setShowNovaPasta(false); setEditandoPasta(null) }}
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800">
                 Cancelar
               </button>
               <button type="button" onClick={editandoPasta ? handleSalvarEdicao : handleCriarPasta} disabled={savingPasta || !novaNome.trim()}
@@ -395,8 +421,8 @@ export default function DocumentosPage() {
       {showUpload && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !uploading && setShowUpload(false)} />
-          <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-100 dark:border-slate-800">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-4">Enviar arquivo</h2>
+          <div className="relative mx-4 w-full max-w-sm rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-4 text-base font-semibold text-white">Enviar arquivo</h2>
             <div className="space-y-3">
               {/* Drop zone */}
               <div
@@ -407,7 +433,7 @@ export default function DocumentosPage() {
                   const f = e.dataTransfer.files[0]
                   if (f) setUploadFile(f)
                 }}
-                className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 dark:hover:border-blue-600 transition">
+                className="cursor-pointer rounded-xl border-2 border-dashed border-slate-700 p-6 text-center transition hover:border-blue-600">
                 <input ref={fileInputRef} type="file" className="hidden"
                   accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt"
                   onChange={e => setUploadFile(e.target.files?.[0] ?? null)} />
@@ -415,7 +441,7 @@ export default function DocumentosPage() {
                   <div className="flex items-center justify-center gap-2">
                     {getFileIcon(uploadFile.type)}
                     <div className="text-left min-w-0">
-                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{uploadFile.name}</p>
+                      <p className="truncate text-sm font-medium text-slate-300">{uploadFile.name}</p>
                       <p className="text-xs text-slate-400">{formatSize(uploadFile.size)}</p>
                     </div>
                     <button type="button" onClick={e => { e.stopPropagation(); setUploadFile(null) }}
@@ -425,14 +451,14 @@ export default function DocumentosPage() {
                   </div>
                 ) : (
                   <>
-                    <Upload className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Clique ou arraste o arquivo</p>
+                    <Upload className="mx-auto mb-2 h-8 w-8 text-slate-600" />
+                    <p className="text-sm text-slate-400">Clique ou arraste o arquivo</p>
                     <p className="text-[11px] text-slate-400 mt-1">PDF, imagens, Word, Excel, TXT — máx 20MB</p>
                   </>
                 )}
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Descrição</label>
+                <label className="mb-1 block text-xs font-medium text-slate-400">Descrição</label>
                 <input value={uploadDesc} onChange={e => setUploadDesc(e.target.value)} className={inp} placeholder="Opcional" />
               </div>
               {uploading && uploadProgress > 0 && (
@@ -440,7 +466,7 @@ export default function DocumentosPage() {
                   <div className="flex justify-between text-xs text-slate-400 mb-1">
                     <span>Enviando...</span><span>{uploadProgress}%</span>
                   </div>
-                  <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
                     <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                   </div>
                 </div>
@@ -448,7 +474,7 @@ export default function DocumentosPage() {
             </div>
             <div className="flex gap-2 mt-5">
               <button type="button" onClick={() => setShowUpload(false)} disabled={uploading}
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-60">
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 disabled:opacity-60">
                 Cancelar
               </button>
               <button type="button" onClick={handleUpload} disabled={!uploadFile || uploading}
@@ -465,17 +491,17 @@ export default function DocumentosPage() {
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmDelete(null)} />
-          <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-slate-100 dark:border-slate-800">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-2">
+          <div className="relative mx-4 w-full max-w-sm rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="mb-2 text-base font-semibold text-white">
               Remover {confirmDelete.tipo === 'pasta' ? 'pasta' : 'arquivo'}
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+            <p className="mb-5 text-sm text-slate-400">
               Remover <strong>"{confirmDelete.nome}"</strong>?
               {confirmDelete.tipo === 'pasta' && ' Todo o conteúdo interno será removido permanentemente.'}
             </p>
             <div className="flex gap-2">
               <button type="button" onClick={() => setConfirmDelete(null)}
-                className="flex-1 px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+                className="flex-1 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800">
                 Cancelar
               </button>
               <button type="button" onClick={handleDelete}

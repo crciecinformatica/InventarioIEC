@@ -15,14 +15,34 @@ export async function GET(request: Request) {
   const tabela = searchParams.get('tabela') || ''
   const acao = searchParams.get('acao') || ''
   const usuario = searchParams.get('usuario') || ''
+  const usuario_id = searchParams.get('usuario_id') || ''
+  const edicoes = searchParams.get('edicoes') === '1'
   const registro_id = searchParams.get('registro_id') || ''
   const sortBy  = searchParams.get('sort') || 'created_at'
   const sortDir = searchParams.get('dir') === 'asc' ? 'asc' : 'desc'
 
   const where: any = {}
-  if (tabela) where.tabela = tabela
-  if (acao) where.acao = acao
-  if (usuario) where.usuario_nome = { contains: usuario, mode: 'insensitive' }
+  if (tabela === 'forum') where.tabela = { startsWith: 'forum_' }
+  else if (tabela) where.tabela = tabela
+  if (edicoes) where.acao = { in: ['UPDATE', 'EDITAR_ALOCACAO'] }
+  else if (acao) where.acao = acao
+  if (usuario_id) where.usuario_id = usuario_id
+  if (usuario && !usuario_id) {
+    const matchingUsers = await prisma.usuarios.findMany({
+      where: {
+        OR: [
+          { nome: { contains: usuario, mode: 'insensitive' } },
+          { email: { contains: usuario, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true },
+      take: 100,
+    })
+    where.OR = [
+      { usuario_nome: { contains: usuario, mode: 'insensitive' } },
+      ...(matchingUsers.length > 0 ? [{ usuario_id: { in: matchingUsers.map(user => user.id) } }] : []),
+    ]
+  }
   if (registro_id) where.registro_id = registro_id
 
   const [data, total] = await Promise.all([
@@ -35,5 +55,19 @@ export async function GET(request: Request) {
     prisma.audit_log.count({ where }),
   ])
 
-  return NextResponse.json({ data, total, page, totalPages: Math.ceil(total / limit) })
+  const userIds = Array.from(new Set(data.map(item => item.usuario_id).filter(Boolean))) as string[]
+  const usuarios = userIds.length > 0
+    ? await prisma.usuarios.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, nome: true },
+      })
+    : []
+  const nomesAtuais = new Map(usuarios.map(user => [user.id, user.nome]))
+  const normalizedData = data.map(item => ({
+    ...item,
+    usuario_nome_original: item.usuario_nome,
+    usuario_nome: item.usuario_id ? (nomesAtuais.get(item.usuario_id) ?? item.usuario_nome) : item.usuario_nome,
+  }))
+
+  return NextResponse.json({ data: normalizedData, total, page, totalPages: Math.ceil(total / limit) })
 }

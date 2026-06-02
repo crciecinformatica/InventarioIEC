@@ -7,8 +7,10 @@ import {
   CalendarClock,
   CheckCircle2,
   ChevronDown,
+  GitPullRequest,
   Layers3,
   MapPin,
+  MessageSquare,
   ShieldAlert,
   Users,
 } from 'lucide-react'
@@ -176,6 +178,7 @@ interface ColaboradorOverviewPanelProps {
 interface AuditOverviewPanelProps {
   total: number
   items: AuditLog[]
+  activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
 }
@@ -446,6 +449,36 @@ function groupByLabel<T>(items: T[], getLabel: (item: T) => string, total: numbe
       detail: `${pct(count, total)}% do total`,
       color: getSectorColor(label),
       distribution: pct(count, total),
+    }))
+    .sort((a, b) => Number(b.value) - Number(a.value))
+
+  return applyDistinctColors(grouped)
+}
+
+function groupAuditUsers(items: AuditLog[], total: number) {
+  const grouped = Array.from(
+    items.reduce((map, item) => {
+      const key = item.usuario_id || item.usuario_nome || 'Sem responsavel'
+      const current = map.get(key)
+      if (current) {
+        current.count += 1
+      } else {
+        map.set(key, {
+          label: item.usuario_nome || 'Sem responsavel',
+          filterValue: item.usuario_id || item.usuario_nome || 'Sem responsavel',
+          count: 1,
+        })
+      }
+      return map
+    }, new Map<string, { label: string; filterValue: string; count: number }>())
+  )
+    .map(([, item]) => ({
+      label: item.label,
+      value: String(item.count),
+      detail: `${pct(item.count, total)}% do total`,
+      color: getSectorColor(item.filterValue),
+      distribution: pct(item.count, total),
+      filterValue: item.filterValue,
     }))
     .sort((a, b) => Number(b.value) - Number(a.value))
 
@@ -1269,15 +1302,20 @@ export function notifyOverviewFilter(filters: ActiveOverviewFilterState[]) {
   ), { id: toastId })
 }
 
-export function AuditOverviewPanel({ total, items, isLoading = false, onFilter }: AuditOverviewPanelProps) {
+export function AuditOverviewPanel({ total, items, activeFilters, isLoading = false, onFilter }: AuditOverviewPanelProps) {
   const scopedItems = items
   const analyzedTotal = scopedItems.length
   const displayedTotal = total || analyzedTotal
   const edits = scopedItems.filter(item => item.acao === 'UPDATE' || item.acao === 'EDITAR_ALOCACAO')
   const deletes = scopedItems.filter(item => item.acao === 'DELETE')
+  const forumItems = scopedItems.filter(item => item.tabela.startsWith('forum_'))
+  const requestItems = scopedItems.filter(item => item.tabela === 'solicitacoes_inventario')
+  const inventoryItems = scopedItems.filter(item => !item.tabela.startsWith('forum_') && item.tabela !== 'solicitacoes_inventario')
   const latest = latestDate(edits.map(item => item.created_at)) ?? latestDate(scopedItems.map(item => item.created_at))
-  const users = groupByLabel(edits, item => item.usuario_nome || 'Sem responsavel', edits.length)
-  const actions = groupByLabel(scopedItems, item => ACAO_LABELS[item.acao] || item.acao || 'Sem acao', scopedItems.length)
+  const users = groupAuditUsers(edits, edits.length)
+  const inventoryActions = groupByLabel(inventoryItems, item => ACAO_LABELS[item.acao] || item.acao || 'Sem acao', inventoryItems.length)
+  const forumActions = groupByLabel(forumItems, item => ACAO_LABELS[item.acao] || item.acao || 'Sem acao', forumItems.length)
+  const requestActions = groupByLabel(requestItems, item => ACAO_LABELS[item.acao] || item.acao || 'Sem acao', requestItems.length)
   const latestLabel = latest ? formatDate(String(latest)) : '—'
 
   return (
@@ -1288,6 +1326,9 @@ export function AuditOverviewPanel({ total, items, isLoading = false, onFilter }
       metrics={[
         { icon: <Layers3 className="h-3.5 w-3.5" />, label: 'Registros', value: displayedTotal.toLocaleString('pt-BR'), filter: { kind: 'all' } },
         { icon: <Activity className="h-3.5 w-3.5" />, label: 'Edicoes', value: edits.length.toLocaleString('pt-BR'), tone: 'warning', filter: { kind: 'audit-edits' } },
+        { icon: <Activity className="h-3.5 w-3.5" />, label: 'Inventário', value: inventoryItems.length.toLocaleString('pt-BR'), tone: 'default', filter: { kind: 'audit-inventory', value: 'inventory', label: 'Inventário' } },
+        { icon: <MessageSquare className="h-3.5 w-3.5" />, label: 'Fórum', value: forumItems.length.toLocaleString('pt-BR'), tone: 'default', filter: { kind: 'audit-forum', value: 'forum', label: 'Fórum' } },
+        { icon: <GitPullRequest className="h-3.5 w-3.5" />, label: 'Pedidos', value: requestItems.length.toLocaleString('pt-BR'), tone: 'default', filter: { kind: 'audit-inventory-requests', value: 'solicitacoes_inventario', label: 'Pedidos de inventário' } },
         { icon: <Users className="h-3.5 w-3.5" />, label: 'Responsaveis', value: users.length.toLocaleString('pt-BR') },
         { icon: <CalendarClock className="h-3.5 w-3.5" />, label: 'Ultima edicao', value: latestLabel },
         { icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'Exclusoes', value: deletes.length.toLocaleString('pt-BR'), tone: deletes.length > 0 ? 'danger' : 'success', filter: { kind: 'audit-action', value: 'DELETE' } },
@@ -1300,14 +1341,44 @@ export function AuditOverviewPanel({ total, items, isLoading = false, onFilter }
         {
           title: 'Edicoes por responsavel',
           icon: <Users className="h-3.5 w-3.5" />,
-          items: users.map(item => ({ ...item, detail: `${item.detail} · edicoes`, filter: { kind: 'audit-user', value: item.label } })),
+          items: users.map(item => ({
+            ...item,
+            detail: `${item.detail} · edicoes`,
+            filter: { kind: 'audit-user', value: item.filterValue, label: `Responsavel: ${item.label}`, color: item.color },
+          })),
           emptyMessage: 'Sem edicoes por responsavel.',
         },
         {
-          title: 'Acoes mais feitas',
+          title: 'Acoes inventario',
           icon: <Activity className="h-3.5 w-3.5" />,
-          items: actions.map(item => ({ ...item, detail: `${item.detail} · ocorrencias`, filter: { kind: 'audit-action-label', value: item.label } })),
-          emptyMessage: 'Sem dados para compor auditoria.',
+          items: inventoryActions.map(item => ({
+            ...item,
+            detail: `${item.detail} · ocorrencias`,
+            filter: { kind: 'audit-inventory-action-label', value: item.label, label: `Inventário: ${item.label}` },
+          })),
+          emptyMessage: 'Sem ações do inventário registradas.',
+          layout: 'half',
+        },
+        {
+          title: 'Acoes forum',
+          icon: <MessageSquare className="h-3.5 w-3.5" />,
+          items: forumActions.map(item => ({
+            ...item,
+            detail: `${item.detail} · ocorrencias`,
+            filter: { kind: 'audit-forum-action-label', value: item.label, label: `Fórum: ${item.label}`, color: item.color },
+          })),
+          emptyMessage: 'Sem ações do fórum registradas.',
+          layout: 'half',
+        },
+        {
+          title: 'Pedidos inventario',
+          icon: <GitPullRequest className="h-3.5 w-3.5" />,
+          items: requestActions.map(item => ({
+            ...item,
+            detail: `${item.detail} · pedidos`,
+            filter: { kind: 'audit-inventory-request-action-label', value: item.label, label: `Pedidos: ${item.label}`, color: item.color },
+          })),
+          emptyMessage: 'Sem pedidos de inventário registrados.',
           layout: 'half',
         },
         {
@@ -1321,6 +1392,7 @@ export function AuditOverviewPanel({ total, items, isLoading = false, onFilter }
         },
       ]}
       onFilter={onFilter}
+      activeFilters={activeFilters}
       isLoading={isLoading}
     />
   )

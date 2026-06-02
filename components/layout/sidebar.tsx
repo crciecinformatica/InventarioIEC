@@ -7,12 +7,12 @@ import { useState, useEffect, useRef, type MouseEvent as ReactMouseEvent } from 
 import {
   LayoutDashboard, Users, Monitor, Laptop, Smartphone, Printer,
   Phone, Server, ScrollText, ChevronLeft,
-  PanelLeftOpen, LogOut, Sun, Moon, Menu, X, UserCog, Loader2,
+  PanelLeftOpen, LogOut, Menu, X, UserCog, Loader2,
   ChevronDown,
   MessageSquare,
-  FolderOpen
+  FolderOpen,
+  GitPullRequest
 } from 'lucide-react'
-import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
 
 type NavItem = {
@@ -20,6 +20,7 @@ type NavItem = {
   label: string
   icon: typeof LayoutDashboard
   adminOnly?: boolean
+  adminStrict?: boolean
 }
 
 type NavGroup = {
@@ -50,13 +51,6 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Serviços',
-    icon: ScrollText,
-    items: [
-      { href: '/movimentacoes', label: 'Auditoria', icon: ScrollText },
-    ],
-  },
-  {
     label: 'Pessoas e acesso',
     icon: Users,
     items: [
@@ -72,32 +66,71 @@ const navGroups: NavGroup[] = [
       { href: '/forum/documentos', label: 'Documentos', icon: FolderOpen },
     ],
   },
+  {
+    label: 'Serviços',
+    icon: ScrollText,
+    items: [
+      { href: '/movimentacoes', label: 'Auditoria', icon: ScrollText },
+      { href: '/pedidos', label: 'Pedidos', icon: GitPullRequest },
+    ],
+  },
 ]
+
+function isNavItemActive(pathname: string, href: string) {
+  if (href === '/') return pathname === '/'
+
+  if (href === '/forum') {
+    return pathname === '/forum' || (pathname.startsWith('/forum/') && !pathname.startsWith('/forum/documentos'))
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
 
 export function Sidebar() {
   const pathname = usePathname()
   const { data: session } = useSession()
-  const { theme, setTheme } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const [pendingHref, setPendingHref] = useState<string | null>(null)
+  const [pendingPedidosCount, setPendingPedidosCount] = useState(0)
   const previousPathnameRef = useRef(pathname)
   const [openGroup, setOpenGroup] = useState<string | null>(() => {
-    return navGroups.find(group => group.items.some(item => pathname.startsWith(item.href)))?.label ?? 'Alocações'
+    return navGroups.find(group => group.items.some(item => isNavItemActive(pathname, item.href)))?.label ?? 'Alocações'
   })
 
+  const perfil = session?.user?.perfil
+  const canManageUsers = perfil === 'admin' || perfil === 'dev'
+  const isStrictAdmin = perfil === 'admin'
   const navGroupsFiltrados = navGroups
     .map(group => ({
       ...group,
-      items: group.items.filter(item => !item.adminOnly || session?.user?.perfil === 'admin'),
+      items: group.items.filter(item => {
+        if (item.adminStrict) return isStrictAdmin
+        return !item.adminOnly || canManageUsers
+      }),
     }))
     .filter(group => group.items.length > 0)
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setMounted(true), 0)
-    return () => window.clearTimeout(timeout)
-  }, [])
+    if (!session?.user) return
+    let cancelled = false
+    async function loadPedidosCount() {
+      try {
+        const res = await fetch('/api/solicitacoes-inventario/count')
+        const json = await res.json().catch(() => ({}))
+        if (!cancelled) setPendingPedidosCount(Number(json.count ?? 0))
+      } catch {
+        if (!cancelled) setPendingPedidosCount(0)
+      }
+    }
+    loadPedidosCount()
+    const interval = window.setInterval(loadPedidosCount, 30000)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [session?.user])
+
   // close mobile drawer on route change
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -117,7 +150,7 @@ export function Sidebar() {
     if (previousPathnameRef.current === pathname) return
     previousPathnameRef.current = pathname
 
-    const activeGroup = navGroups.find(group => group.items.some(item => pathname.startsWith(item.href)))?.label
+    const activeGroup = navGroups.find(group => group.items.some(item => isNavItemActive(pathname, item.href)))?.label
     if (!activeGroup) return
 
     const timeout = window.setTimeout(() => setOpenGroup(activeGroup), 0)
@@ -157,7 +190,7 @@ export function Sidebar() {
     { href, label, icon: Icon }: NavItem,
     options: { collapsed?: boolean; nested?: boolean } = {}
   ) => {
-    const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
+    const active = isNavItemActive(pathname, href)
     const pending = pendingHref === href && !active
     const { collapsed: isCollapsed = false, nested = false } = options
 
@@ -191,6 +224,11 @@ export function Sidebar() {
         {pending && <Loader2 className="w-4 h-4 shrink-0 animate-spin" />}
         {!pending && !nested && <Icon className="w-4 h-4 shrink-0" />}
         {!isCollapsed && <span className="truncate">{label}</span>}
+        {!isCollapsed && href === '/pedidos' && pendingPedidosCount > 0 && (
+          <span className="ml-auto min-w-5 rounded-full bg-blue-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white">
+            {pendingPedidosCount > 99 ? '99+' : pendingPedidosCount}
+          </span>
+        )}
         {pending && !isCollapsed && (
           <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/80 animate-pulse" />
         )}
@@ -210,11 +248,12 @@ export function Sidebar() {
           )}
         >
           {(() => {
-            const groupActive = group.items.some(item => pathname.startsWith(item.href))
-            const activeItem = group.items.find(item => pathname.startsWith(item.href))
+            const groupActive = group.items.some(item => isNavItemActive(pathname, item.href))
+            const activeItem = group.items.find(item => isNavItemActive(pathname, item.href))
             const GroupIcon = activeItem?.icon ?? group.icon
             const groupPending = group.items.some(item => pendingHref === item.href)
             const expanded = openGroup === group.label
+            const groupPedidosCount = group.label === 'Serviços' ? pendingPedidosCount : 0
 
             return (
               <>
@@ -238,6 +277,11 @@ export function Sidebar() {
                   {!isCollapsed && (
                     <>
                       <span className="truncate">{group.label}</span>
+                      {groupPedidosCount > 0 && (
+                        <span className="ml-auto min-w-5 rounded-full bg-blue-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white">
+                          {groupPedidosCount > 99 ? '99+' : groupPedidosCount}
+                        </span>
+                      )}
                       <ChevronDown
                         className={cn(
                           'w-4 h-4 shrink-0 text-slate-400 transition-transform',
@@ -248,6 +292,11 @@ export function Sidebar() {
                   )}
                   {groupActive && isCollapsed && (
                     <span className="absolute -left-2 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-blue-500" />
+                  )}
+                  {isCollapsed && groupPedidosCount > 0 && (
+                    <span className="absolute right-1 top-1 h-4 min-w-4 rounded-full bg-blue-500 px-1 text-center text-[9px] font-bold leading-4 text-white">
+                      {groupPedidosCount > 9 ? '9+' : groupPedidosCount}
+                    </span>
                   )}
                 </button>
 
@@ -314,27 +363,6 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-slate-700/50 p-2 space-y-1 shrink-0">
-        {/* Theme toggle */}
-        {mounted && (
-          <button
-            type="button"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className={cn(
-              'flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/60 transition',
-              collapsed && 'justify-center px-2'
-            )}
-            title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
-          >
-            {theme === 'dark'
-              ? <Sun  className="w-4 h-4 shrink-0" />
-              : <Moon className="w-4 h-4 shrink-0" />
-            }
-            {!collapsed && (
-              <span className="text-sm">{theme === 'dark' ? 'Modo claro' : 'Modo escuro'}</span>
-            )}
-          </button>
-        )}
-
         {/* User */}
         <div className={cn('flex items-center gap-2 px-2 py-1.5', collapsed && 'justify-center')}>
           <div className="w-7 h-7 rounded-full bg-blue-700 flex items-center justify-center text-[10px] font-bold text-blue-200 shrink-0">

@@ -15,6 +15,7 @@ import type { Impressora } from '@/types'
 import { SetorSelect } from './setor-select'
 import { LocalidadeSelect } from './localidade-select'
 import { AnimatedSheetFrame } from '@/components/layout/motion-primitives'
+import { DeviceCommentsPopover } from '@/components/forum/device-comments-popover'
 
 const schema = z.object({
   nome_host: z.string().optional().nullable(),
@@ -33,7 +34,7 @@ type FormData = z.infer<typeof schema>
 interface Props { impressora: Impressora; onClose: () => void; onRefresh: () => void }
 
 export function ImpressoraModal({ impressora, onClose, onRefresh }: Props) {
-  const { isAdmin } = usePermission()
+  const { isAdmin, canRequestInventoryChanges } = usePermission()
   const [mode, setMode] = useState<'view' | 'edit'>('view')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [setorId, setSetorId] = useState<string | null>(
@@ -77,6 +78,7 @@ export function ImpressoraModal({ impressora, onClose, onRefresh }: Props) {
 
   return (
     <>
+      <DeviceCommentsPopover tipoItem="impressoras" itemId={impressora.id} />
       <AnimatedSheetFrame onClose={onClose}>
 
           <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
@@ -158,11 +160,11 @@ export function ImpressoraModal({ impressora, onClose, onRefresh }: Props) {
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex gap-2">
             {mode === 'view' ? (
               <>
-{isAdmin && (                <button type="button" onClick={(e) => {e.preventDefault(); setShowDeleteConfirm(true)}}
+{(isAdmin || canRequestInventoryChanges) && (                <button type="button" onClick={(e) => {e.preventDefault(); setShowDeleteConfirm(true)}}
                   className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition">
                   <Trash2 className="w-3.5 h-3.5" /> Excluir
                 </button>)}
-{isAdmin && (                <button type="button" onClick={(e) => {e.preventDefault(); setMode('edit')}}
+{(isAdmin || canRequestInventoryChanges) && (                <button type="button" onClick={(e) => {e.preventDefault(); setMode('edit')}}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
                   <Pencil className="w-3.5 h-3.5" /> Editar
                 </button>)}

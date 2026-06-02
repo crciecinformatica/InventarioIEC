@@ -136,7 +136,7 @@ const columns: ColumnDef<Aparelho>[] = [
 ];
 
 export default function AparelhosPage() {
-  const { isAdmin } = usePermission();
+  const { isAdmin, canRequestInventoryChanges } = usePermission();
 
   const [data, setData] = useState<Aparelho[]>([]);
   const [total, setTotal] = useState(0);
@@ -690,7 +690,7 @@ export default function AparelhosPage() {
         title="Aparelhos"
         total={total}
       >
-        {isAdmin && (
+        {(isAdmin || canRequestInventoryChanges) && (
           <button
             type="button"
             onClick={() => setShowCriar(true)}

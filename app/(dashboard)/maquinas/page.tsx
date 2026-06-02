@@ -54,7 +54,7 @@ function isBackupMachine(item: Maquina) {
 }
 
 export default function MaquinasPage() {
-  const { isAdmin } = usePermission()
+  const { isAdmin, canRequestInventoryChanges } = usePermission()
   const [data, setData] = useState<Maquina[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -79,7 +79,7 @@ export default function MaquinasPage() {
   const [categoria, setCategoria] = useState('')
   const [fabricante, setFabricante] = useState('')
   const [alocacao, setAlocacao] = useState('')
-  const [sort, setSort] = useState('nome_host')
+  const [sort, setSort] = useState('endereco_ip')
   const [dir, setDir] = useState<'asc' | 'desc'>('asc')
 
   function refresh() { setRefreshKey(k => k + 1) }
@@ -253,8 +253,8 @@ export default function MaquinasPage() {
       header: 'Máquina',
       cell: ({ row }) => (
         <div>
-          <span className="font-medium text-slate-900 dark:text-slate-100">{row.original.nome_host || row.original.modelo || '—'}</span>
-          <p className="text-xs text-slate-400">{row.original.endereco_ip || row.original.modelo || 'Sem modelo'}</p>
+          <span className="font-medium text-slate-900 dark:text-slate-100">{row.original.endereco_ip || row.original.nome_host || '—'}</span>
+          <p className="text-xs text-slate-400">{[row.original.nome_host, row.original.modelo].filter(Boolean).join(' · ') || 'Sem host/modelo'}</p>
         </div>
       ),
       enableSorting: true,
@@ -316,7 +316,7 @@ export default function MaquinasPage() {
         <input
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-          placeholder="Nome, identificador ou colaborador..."
+          placeholder="IP, host, identificador ou colaborador..."
           className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
@@ -383,8 +383,10 @@ export default function MaquinasPage() {
         }}
         className={inputCls}
       >
-        <option value="nome_host:asc">Nome A→Z</option>
-        <option value="nome_host:desc">Nome Z→A</option>
+        <option value="endereco_ip:asc">IP A→Z</option>
+        <option value="endereco_ip:desc">IP Z→A</option>
+        <option value="nome_host:asc">Host A→Z</option>
+        <option value="nome_host:desc">Host Z→A</option>
         <option value="created_at:desc">Mais recentes</option>
         <option value="created_at:asc">Mais antigos</option>
         <option value="fabricante:asc">Fabricante A→Z</option>
@@ -395,7 +397,7 @@ export default function MaquinasPage() {
   return (
     <div className="p-4 md:p-6 max-w-screen-2xl mx-auto">
       <PageHeader title="Máquinas" total={total}>
-        {isAdmin && (<button type="button" onClick={() => setShowCriar(true)}
+        {(isAdmin || canRequestInventoryChanges) && (<button type="button" onClick={() => setShowCriar(true)}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
           <Plus className="w-4 h-4" /> Nova Máquina
         </button>)}

@@ -19,10 +19,11 @@ export function ConfirmDialog({ title, description, onConfirm, onCancel, loading
   function handleCancel() {
     if (loading) return
     setOpen(false)
+    onCancel()
   }
 
   return (
-    <AnimatePresence onExitComplete={onCancel}>
+    <AnimatePresence>
       {open && (
         <AnimatedDialogFrame onClose={handleCancel} zClassName="z-[60]" className="max-w-sm rounded-xl border border-slate-100 p-6 dark:border-slate-800">
           <div className="flex items-center gap-3 mb-3">

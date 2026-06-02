@@ -158,8 +158,8 @@ export async function GET(request: Request) {
       ...maquinas.map((m: any) => ({
         id: m.id,
         tipo: 'maquina',
-        label: m.nome_host || m.identificador || '—',
-        sub: [m.fabricante, m.modelo].filter(Boolean).join(' '),
+        label: m.endereco_ip || m.nome_host || m.identificador || '—',
+        sub: [m.nome_host, m.fabricante, m.modelo].filter(Boolean).join(' · '),
         meta: m.setor_rel?.nome ?? '',
         href: `/maquinas?inspect=${m.id}`,
       })),

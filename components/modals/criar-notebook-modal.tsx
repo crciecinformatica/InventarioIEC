@@ -39,6 +39,11 @@ export function CriarNotebookModal({ onClose, onRefresh }: Props) {
   async function onSubmit(data: FormData) {
     const notebook = await create({ ...data, setor_id: setorId, localidade_id: localidadeId })
     if (!notebook) return
+    if ((notebook as any).__solicitacaoInventario) {
+      onRefresh()
+      onClose()
+      return
+    }
 
     if (colabId) {
       setSavingAlocacao(true)

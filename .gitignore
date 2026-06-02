@@ -43,6 +43,9 @@ supabase/.temp/
 supabase/.temp*/
 supabase/migrations 2/
 
+# local database dumps
+database-dumps/
+
 # vercel
 .vercel
 

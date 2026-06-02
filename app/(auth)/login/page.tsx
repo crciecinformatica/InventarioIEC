@@ -7,6 +7,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Loader2, Server } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { toast } from 'sonner'
 
 const schema = z.object({
   email: z.string().email('E-mail inválido'),
@@ -15,13 +17,28 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
+const requestSchema = z.object({
+  nome: z.string().min(2, 'Nome obrigatório'),
+  codigo_pessoa: z.string().min(1, 'Código obrigatório'),
+  email: z.string().email('E-mail inválido'),
+  senha: z.string().min(6, 'Mínimo 6 caracteres'),
+})
+
+type RequestFormData = z.infer<typeof requestSchema>
+
 export default function LoginPage() {
   const router = useRouter()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState<'login' | 'request'>('login')
+  const [requestLoading, setRequestLoading] = useState(false)
+  const [navigating, setNavigating] = useState(false)
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+  })
+  const requestForm = useForm<RequestFormData>({
+    resolver: zodResolver(requestSchema),
   })
 
   const onSubmit = async (data: FormData) => {
@@ -36,13 +53,67 @@ export default function LoginPage() {
     if (result?.error) {
       setError('E-mail ou senha incorretos.')
     } else {
+      setNavigating(true)
       router.push('/')
       router.refresh()
     }
   }
 
+  const onRequestSubmit = async (data: RequestFormData) => {
+    setRequestLoading(true)
+    try {
+      const res = await fetch('/api/auth/solicitar-acesso', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: data.nome,
+          codigo_pessoa: data.codigo_pessoa,
+          email: data.email,
+          senha: data.senha,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(json.error || 'Não foi possível enviar a solicitação.')
+        return
+      }
+      toast.success(json.message || 'Solicitação enviada. Aguarde aprovação para acessar.')
+      requestForm.reset()
+      setMode('login')
+    } catch {
+      toast.error('Erro ao enviar solicitação.')
+    } finally {
+      setRequestLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <AnimatePresence>
+        {navigating && (
+          <motion.div
+            key="login-loading"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              className="flex flex-col items-center text-center"
+            >
+              <div className="mb-5 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-950/40">
+                <Server className="h-8 w-8 text-white" />
+              </div>
+              <div className="h-8 w-8 rounded-full border-2 border-blue-400/30 border-t-blue-400 animate-spin" />
+              <p className="mt-4 text-sm font-semibold text-white">Carregando plataforma</p>
+              <p className="mt-1 text-xs text-slate-400">Preparando dashboard e permissões...</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -55,9 +126,35 @@ export default function LoginPage() {
 
         {/* Form card */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-8">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-6">Acessar sistema</h2>
+          <div className="flex rounded-lg bg-slate-100 dark:bg-slate-900 p-1 mb-6">
+            <button
+              type="button"
+              onClick={() => setMode('login')}
+              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${mode === 'login' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'}`}
+            >
+              Entrar
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('request')}
+              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${mode === 'request' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'}`}
+            >
+              Solicitar acesso
+            </button>
+          </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <AnimatePresence mode="wait" initial={false}>
+          {mode === 'login' ? (
+          <motion.form
+            key="login-form"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.16 }}
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-5"
+          >
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Acessar sistema</h2>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                 E-mail
@@ -100,7 +197,49 @@ export default function LoginPage() {
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
-          </form>
+          </motion.form>
+          ) : (
+          <motion.form
+            key="request-form"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.16 }}
+            onSubmit={requestForm.handleSubmit(onRequestSubmit)}
+            className="space-y-4"
+          >
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Solicitar criação de usuário</h2>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Nome completo</label>
+              <input {...requestForm.register('nome')} className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              {requestForm.formState.errors.nome && <p className="text-red-500 text-xs mt-1">{requestForm.formState.errors.nome.message}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Código de pessoa</label>
+              <input {...requestForm.register('codigo_pessoa')} className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              {requestForm.formState.errors.codigo_pessoa && <p className="text-red-500 text-xs mt-1">{requestForm.formState.errors.codigo_pessoa.message}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">E-mail</label>
+              <input {...requestForm.register('email')} type="email" autoComplete="email" className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              {requestForm.formState.errors.email && <p className="text-red-500 text-xs mt-1">{requestForm.formState.errors.email.message}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Senha</label>
+              <input {...requestForm.register('senha')} type="password" autoComplete="new-password" className="w-full px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+              {requestForm.formState.errors.senha && <p className="text-red-500 text-xs mt-1">{requestForm.formState.errors.senha.message}</p>}
+            </div>
+            <button
+              type="submit"
+              disabled={requestLoading}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium rounded-lg transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm"
+            >
+              {requestLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {requestLoading ? 'Enviando...' : 'Enviar solicitação'}
+            </button>
+          </motion.form>
+          )}
+          </AnimatePresence>
 
           <p className="text-xs text-slate-400 text-center mt-6">
             Acesso restrito a colaboradores autorizados.

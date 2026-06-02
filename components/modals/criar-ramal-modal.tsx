@@ -42,6 +42,11 @@ export function CriarRamalModal({ onClose, onRefresh }: Props) {
   async function onSubmit(data: FormData) {
     const ramal = await create({ ...data, setor_id: setorId, localidade_id: localidadeId })
     if (!ramal) return
+    if ((ramal as any).__solicitacaoInventario) {
+      onRefresh()
+      onClose()
+      return
+    }
 
     if (colabId) {
       setSavingAlocacao(true)
