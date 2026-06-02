@@ -47,6 +47,7 @@ model solicitacoes_usuarios {
 
   @@index([status], map: "idx_solicitacoes_usuarios_status")
   @@index([email], map: "idx_solicitacoes_usuarios_email")
+  @@index([codigo_pessoa], map: "idx_solicitacoes_usuarios_codigo_pessoa")
 }
 
 model setores {
@@ -346,7 +347,7 @@ model solicitacoes_inventario {
   acao              String
   dados_anteriores  Json?
   dados_propostos   Json?
-  comentarios       Json?
+  comentarios       Json?     @default("[]")
   solicitante_id    String?   @db.Uuid
   solicitante_nome  String?
   revisor_id        String?   @db.Uuid
@@ -413,6 +414,8 @@ model forum_comentarios {
   reacoes    forum_reacoes[]
   vinculos   forum_vinculos[]
   arquivos   forum_arquivos[]
+
+  @@index([expira_em], map: "idx_forum_comentarios_expira_em")
 }
 
 model forum_vinculos {
@@ -425,6 +428,8 @@ model forum_vinculos {
   created_at    DateTime?          @default(now()) @db.Timestamptz(6)
   comentario    forum_comentarios? @relation(fields: [comentario_id], references: [id], onDelete: Cascade)
   topico        forum_topicos?     @relation(fields: [topico_id], references: [id], onDelete: Cascade)
+
+  @@index([tipo_item, item_id], map: "idx_forum_vinculos_item")
 }
 
 model forum_reacoes {
