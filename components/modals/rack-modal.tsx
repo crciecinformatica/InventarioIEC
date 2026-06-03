@@ -76,7 +76,11 @@ export function RackModal({ rack, onClose, onRefresh }: Props) {
 
   return (
     <>
-      <DeviceCommentsPopover tipoItem="racks" itemId={rack.id} />
+      <DeviceCommentsPopover
+        tipoItem="racks"
+        itemId={rack.id}
+        itemLabel={rack.nome_switch ?? rack.numero_patrimonio}
+      />
       <AnimatedSheetFrame onClose={onClose}>
 
           {/* Header */}

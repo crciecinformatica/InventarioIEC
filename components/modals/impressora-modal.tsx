@@ -78,7 +78,11 @@ export function ImpressoraModal({ impressora, onClose, onRefresh }: Props) {
 
   return (
     <>
-      <DeviceCommentsPopover tipoItem="impressoras" itemId={impressora.id} />
+      <DeviceCommentsPopover
+        tipoItem="impressoras"
+        itemId={impressora.id}
+        itemLabel={impressora.nome_host ?? impressora.modelo ?? impressora.numero_serie}
+      />
       <AnimatedSheetFrame onClose={onClose}>
 
           <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">

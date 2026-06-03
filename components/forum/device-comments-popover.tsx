@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { MessageSquare, X } from 'lucide-react'
@@ -23,22 +24,30 @@ interface DeviceForumComment {
 interface Props {
   tipoItem: string
   itemId?: string | null
+  itemLabel?: string | null
 }
 
-export function DeviceCommentsPopover({ tipoItem, itemId }: Props) {
+export function DeviceCommentsPopover({ tipoItem, itemId, itemLabel }: Props) {
   const [items, setItems] = useState<DeviceForumComment[]>([])
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const reduceMotion = useReducedMotion()
 
   useEffect(() => {
-    if (!itemId) return
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!itemId && !itemLabel) return
     let cancelled = false
-    const params = new URLSearchParams({ tipo_item: tipoItem, ids: itemId })
+    const params = new URLSearchParams({ tipo_item: tipoItem })
+    if (itemId) params.set('ids', itemId)
+    if (itemLabel) params.set('labels', itemLabel)
     fetch(`/api/forum/vinculos-resumo?${params}`)
       .then(res => res.ok ? res.json() : { data: [] })
       .then(json => {
         if (!cancelled) {
-          const bucket = json.data?.[itemId]
+          const bucket = (itemId ? json.data?.[itemId] : null) ?? (itemLabel ? json.data?.[itemLabel] : null)
           const data = Array.isArray(bucket?.items) ? bucket.items.map((item: any) => ({
             id: item.id,
             topico_id: item.topico_id,
@@ -59,12 +68,12 @@ export function DeviceCommentsPopover({ tipoItem, itemId }: Props) {
         if (!cancelled) setItems([])
       })
     return () => { cancelled = true }
-  }, [tipoItem, itemId])
+  }, [tipoItem, itemId, itemLabel])
 
-  if (!itemId || items.length === 0) return null
+  if (!mounted || (!itemId && !itemLabel) || items.length === 0) return null
 
-  return (
-    <div className="pointer-events-none fixed right-4 top-4 z-[70] flex max-w-[calc(100vw-2rem)] items-start gap-3 md:right-6 md:top-6">
+  return createPortal(
+    <div className="pointer-events-none fixed right-4 top-4 z-[90] flex max-w-[calc(100vw-2rem)] items-start gap-3 md:right-6 md:top-6">
       <AnimatePresence initial={false}>
         {open && (
           <motion.aside
@@ -121,6 +130,7 @@ export function DeviceCommentsPopover({ tipoItem, itemId }: Props) {
           {items.length}
         </span>
       </button>
-    </div>
+    </div>,
+    document.body
   )
 }
