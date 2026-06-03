@@ -170,7 +170,11 @@ export function MaquinaModal({ maquina, onClose, onRefresh }: Props) {
 
  return (
   <>
-   <DeviceCommentsPopover tipoItem="maquinas" itemId={maquina.id} />
+   <DeviceCommentsPopover
+    tipoItem="maquinas"
+    itemId={maquina.id}
+    itemLabel={maquina.nome_host ?? maquina.identificador}
+   />
    <AnimatedDialogFrame onClose={onClose} className="flex max-h-[90vh] max-w-4xl flex-col rounded-2xl">
      <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">
       <div>

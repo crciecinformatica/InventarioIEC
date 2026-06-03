@@ -31,7 +31,7 @@ export function RouteTransition({ children }: { children: React.ReactNode }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.16, ease }}
+        transition={{ duration: 0.18, ease }}
       >
         {children}
       </motion.div>
@@ -94,7 +94,7 @@ export function AnimatedDialogFrame({
 
   return (
     <motion.div
-      className={cn('fixed inset-0 flex items-center justify-center p-4', zClassName)}
+      className={cn('fixed inset-0 flex items-start justify-center overflow-y-auto overscroll-contain px-4 pb-4 pt-5 sm:pt-8 lg:pt-[5vh]', zClassName)}
       initial={disableMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}

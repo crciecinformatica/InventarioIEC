@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import type { ElementType } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { VinculosSection } from '@/components/forum/vinculos-section'
@@ -8,11 +10,14 @@ import { ItemVincularSelect } from '@/components/forum/item-vincular-select'
 import { ReacaoButton } from '@/components/forum/reacao-button'
 import { FileUploadButton } from '@/components/forum/file-upload-button'
 import { ForumFileEmbed } from '@/components/forum/forum-file-embed'
-import { AlertTriangle } from 'lucide-react'
+import { ForumEtiquetaBadges, ForumEtiquetaSelect } from '@/components/forum/forum-etiquetas'
+import { ForumFolderSelect, type ForumPastaSelecionada } from '@/components/forum/forum-folder-select'
+import type { ForumEtiqueta } from '@/lib/forum'
+import { AlertTriangle, FolderOpen } from 'lucide-react'
 import { AnimatedDialogFrame } from '@/components/layout/motion-primitives'
 import {
-  ArrowLeft, Lock, Pin, MessageSquare,
-  Eye, Pencil, Trash2, Loader2, Check, X,
+  ArrowLeft, Lock, Pin,
+  Pencil, Trash2, Loader2, Check, X, MessageSquare, ThumbsUp, ThumbsDown, CheckCircle2, Users, Plus,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -44,6 +49,7 @@ export default function TopicoPage() {
   const [novoArquivos, setNovoArquivos] = useState<UploadedFile[]>([])
   const [savingComentario, setSavingComentario] = useState(false)
   const [showUploadNovoComentario, setShowUploadNovoComentario] = useState(false)
+  const [commentOpen, setCommentOpen] = useState(false)
   const tempComentarioId = 'temp-c-' + Math.random().toString(36).substr(2, 9)
 
   // Edição inline de comentários
@@ -54,12 +60,15 @@ export default function TopicoPage() {
   const [editandoTopico, setEditandoTopico] = useState(false)
   const [editTitulo, setEditTitulo]         = useState('')
   const [editConteudoTopico, setEditConteudoTopico] = useState('')
+  const [editEtiquetas, setEditEtiquetas]   = useState<ForumEtiqueta[]>(['comentario'])
   const [editVinculos, setEditVinculos]     = useState<any[]>([])
+  const [editPastas, setEditPastas]         = useState<ForumPastaSelecionada[]>([])
   const [editArquivos, setEditArquivos]     = useState<UploadedFile[]>([])
   const [showUploadEditTopico, setShowUploadEditTopico] = useState(false)
   const [savingTopico, setSavingTopico]     = useState(false)
   const [editComentarioArquivos, setEditComentarioArquivos] = useState<UploadedFile[]>([])
   const [showUploadEditComentario, setShowUploadEditComentario] = useState(false)
+  const reduceMotion = useReducedMotion()
 
   // Handlers para upload na edição do comentário
   function handleFileUploadEditComentario(file: UploadedFile) {
@@ -161,6 +170,7 @@ export default function TopicoPage() {
       setNovoVinculos([])
       setNovoArquivos([])
       setShowUploadNovoComentario(false)
+      setCommentOpen(false)
       load()
     } catch { toast.error('Erro ao comentar.') }
     finally { setSavingComentario(false) }
@@ -198,6 +208,21 @@ export default function TopicoPage() {
     load()
   }
 
+  async function toggleAvaliacao(tipo: 'aprovado' | 'reprovado') {
+    try {
+      const res = await fetch(`/api/forum/${id}/avaliacao`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo }),
+      })
+      if (!res.ok) throw new Error()
+      const json = await res.json()
+      setTopico((current: any) => current ? { ...current, avaliacoes: json.avaliacoes ?? [] } : current)
+    } catch {
+      toast.error('Erro ao avaliar tópico.')
+    }
+  }
+
   async function salvarTopico() {
     if (!editTitulo.trim() || !editConteudoTopico.trim()) {
       toast.error('Preencha os campos obrigatórios.')
@@ -211,7 +236,9 @@ export default function TopicoPage() {
         body: JSON.stringify({ 
           titulo: editTitulo, 
           conteudo: editConteudoTopico, 
+          etiquetas: editEtiquetas,
           vinculos: editVinculos,
+          pasta_ids: editPastas.map(pasta => pasta.id),
           arquivo_ids: editArquivos.map(a => a.id)
         }),
       })
@@ -252,23 +279,47 @@ export default function TopicoPage() {
   )
 
   const inp = "w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const comments = Array.isArray(topico.comentarios) ? topico.comentarios : []
+  const collaborators = Array.from(new Map(comments.map((c: any) => [c.autor_nome, c])).values())
+  const reactionSummary = comments.reduce((acc: { util: number; resolveu: number }, comment: any) => {
+    for (const reacao of comment.reacoes ?? []) {
+      if (reacao.tipo === 'util') acc.util += 1
+      if (reacao.tipo === 'resolveu') acc.resolveu += 1
+    }
+    return acc
+  }, { util: 0, resolveu: 0 })
+  const avaliacoes = Array.isArray(topico.avaliacoes) ? topico.avaliacoes : []
+  const avaliacaoSummary = {
+    aprovado: avaliacoes.filter((item: any) => item.tipo === 'aprovado').length,
+    reprovado: avaliacoes.filter((item: any) => item.tipo === 'reprovado').length,
+    minha: avaliacoes.find((item: any) => item.usuario_id === userId)?.tipo as 'aprovado' | 'reprovado' | undefined,
+  }
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto">
+    <div className="min-h-[calc(100vh-5rem)] bg-slate-950 p-4 text-slate-100 md:p-6">
+    <div className="mx-auto max-w-screen-xl">
       <button type="button" onClick={() => router.back()}
-        className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition mb-4">
+        className="mb-4 flex items-center gap-2 text-sm text-slate-500 transition hover:text-slate-200">
         <ArrowLeft className="w-4 h-4" /> Fórum
       </button>
 
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <main className="min-w-0">
       {/* Tópico */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-5 mb-6">
+      <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl shadow-black/10">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
               {topico.fixado && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-600"><Pin className="w-3 h-3" />Fixado</span>}
               {topico.fechado && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-slate-400"><Lock className="w-3 h-3" />Fechado</span>}
+              <ForumEtiquetaBadges etiquetas={topico.etiquetas ?? []} />
             </div>
-            {!editandoTopico && <h1 className="text-lg font-bold text-slate-900 dark:text-white">{topico.titulo}</h1>}
+            {!editandoTopico && <h1 className="text-2xl font-bold text-white">{topico.titulo}</h1>}
+            {!editandoTopico && (
+              <p className="mt-2 text-xs text-slate-500">
+                {topico.autor_nome} · {formatDate(topico.created_at)}
+              </p>
+            )}
           </div>
           
           {/* Ações admin / autor */}
@@ -314,7 +365,9 @@ export default function TopicoPage() {
                   onClick={() => {
                     setEditTitulo(topico.titulo)
                     setEditConteudoTopico(topico.conteudo)
+                    setEditEtiquetas((topico.etiquetas ?? []).map((item: any) => item.etiqueta))
                     setEditVinculos(topico.vinculos ?? [])
+                    setEditPastas((topico.pastas ?? []).map((item: any) => item.pasta).filter(Boolean))
                     setEditArquivos(topico.arquivos ?? [])
                     setEditandoTopico(true)
                   }}
@@ -337,9 +390,17 @@ export default function TopicoPage() {
               <label className="block text-xs font-medium text-slate-500 mb-1">Conteúdo *</label>
               <textarea value={editConteudoTopico} onChange={e => setEditConteudoTopico(e.target.value)} rows={6} className={inp} placeholder="Conteúdo" />
             </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3">
+              <ForumEtiquetaSelect value={editEtiquetas} onChange={setEditEtiquetas} />
+            </div>
             
-            <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/40">
+            <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-950/60">
               <ItemVincularSelect vinculos={editVinculos} onChange={setEditVinculos} />
+            </div>
+
+            <div className="border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-950/60">
+              <ForumFolderSelect value={editPastas} onChange={setEditPastas} />
             </div>
 
             {/* Upload de arquivos na Edição do Tópico */}
@@ -380,7 +441,7 @@ export default function TopicoPage() {
           </div>
         ) : (
           <>
-            <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed mb-4 mt-2">
+            <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed mb-4 mt-2">
               {topico.conteudo}
             </p>
             
@@ -394,20 +455,40 @@ export default function TopicoPage() {
               </div>
             )}
 
+            {topico.pastas && topico.pastas.length > 0 && (
+              <div className="space-y-2 mb-4 border-t border-slate-100 pt-3 dark:border-slate-800/60">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Pastas vinculadas:</p>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {topico.pastas.map((item: any) => item.pasta).filter(Boolean).map((pasta: any) => (
+                    <a
+                      key={pasta.id}
+                      href={`/forum/documentos?pasta=${pasta.id}`}
+                      className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-300 transition hover:border-violet-700 hover:text-white"
+                    >
+                      <FolderOpen className="h-4 w-4 shrink-0 text-violet-300" />
+                      <span className="min-w-0 flex-1 truncate">{pasta.nome}</span>
+                      <span className="text-xs text-slate-500">{pasta._count?.arquivos ?? 0}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <VinculosSection vinculos={topico.vinculos ?? []} />
           </>
         )}
       </div>
 
       {/* Comentários */}
-      <div className="space-y-4 mb-6">
-        {topico.comentarios?.length === 0 && (
+      <div className="relative mb-6 space-y-4 before:absolute before:left-4 before:top-3 before:h-[calc(100%-1.5rem)] before:w-px before:bg-slate-800">
+        {comments.length === 0 && (
           <p className="text-center text-sm text-slate-400 py-4">Nenhum comentário ainda. Seja o primeiro!</p>
         )}
-        {topico.comentarios?.map((c: any) => (
-          <div key={c.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
+        {comments.map((c: any) => (
+          <div key={c.id} className="relative ml-8 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 shadow-lg shadow-black/10">
+            <span className="absolute -left-[1.72rem] top-5 h-3 w-3 rounded-full border border-blue-500 bg-slate-950 shadow-[0_0_0_4px_rgb(15_23_42)]" />
             <div className="flex">
-              <div className="w-1 bg-slate-200 dark:bg-slate-700 shrink-0" />
+              <div className="w-1 bg-blue-600/70 shrink-0" />
               <div className="flex-1 p-4">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="text-xs text-slate-500 dark:text-slate-400">
@@ -479,7 +560,7 @@ export default function TopicoPage() {
   </div>
 ) : (
                   <>
-                    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
                       {c.conteudo}
                     </p>
                     
@@ -507,9 +588,36 @@ export default function TopicoPage() {
 
       {/* Form novo comentário */}
       {!topico.fechado ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Adicionar comentário</h3>
-          <form onSubmit={submitComentario} className="space-y-3">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+          {!commentOpen ? (
+            <button
+              type="button"
+              onClick={() => setCommentOpen(true)}
+              className="flex w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-left transition hover:border-blue-600 hover:bg-slate-900"
+            >
+              <span>
+                <span className="block text-sm font-semibold text-slate-100">Adicionar comentário</span>
+                <span className="mt-0.5 block text-xs text-slate-500">Clique para abrir resposta, vínculos e anexos.</span>
+              </span>
+              <Plus className="h-4 w-4 text-blue-300" />
+            </button>
+          ) : null}
+          <AnimatePresence initial={false}>
+          {commentOpen && (
+          <motion.div
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Adicionar comentário</h3>
+              <button type="button" onClick={() => setCommentOpen(false)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-slate-200">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={submitComentario} className="space-y-3">
             <textarea value={novoConteudo} onChange={e => setNovoConteudo(e.target.value)} rows={4}
               placeholder="Escreva sua resposta..." className={inp} />
             
@@ -552,7 +660,10 @@ export default function TopicoPage() {
                 Comentar
               </button>
             </div>
-          </form>
+            </form>
+          </motion.div>
+          )}
+          </AnimatePresence>
         </div>
       ) : (
         <div className="text-center py-4 border border-slate-100 dark:border-slate-800 rounded-xl text-sm text-slate-400">
@@ -560,6 +671,94 @@ export default function TopicoPage() {
           Este tópico está fechado para novos comentários.
         </div>
       )}
+      </main>
+
+      <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Resumo do fórum</p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <ForumStat icon={MessageSquare} label="Comentários" value={comments.length} />
+            <ForumStat icon={ThumbsUp} label="Útil" value={reactionSummary.util} />
+            <ForumStat icon={CheckCircle2} label="Resolveu" value={reactionSummary.resolveu} />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => toggleAvaliacao('aprovado')}
+              className={`rounded-xl border px-3 py-2 text-left transition ${
+                avaliacaoSummary.minha === 'aprovado'
+                  ? 'border-emerald-600 bg-emerald-950/50 text-emerald-100'
+                  : 'border-slate-800 bg-slate-950/70 text-slate-300 hover:border-emerald-700'
+              }`}
+            >
+              <ThumbsUp className="mb-1 h-4 w-4" />
+              <span className="block text-sm font-bold">{avaliacaoSummary.aprovado}</span>
+              <span className="text-[11px] text-slate-500">Aprovar</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleAvaliacao('reprovado')}
+              className={`rounded-xl border px-3 py-2 text-left transition ${
+                avaliacaoSummary.minha === 'reprovado'
+                  ? 'border-red-600 bg-red-950/50 text-red-100'
+                  : 'border-slate-800 bg-slate-950/70 text-slate-300 hover:border-red-700'
+              }`}
+            >
+              <ThumbsDown className="mb-1 h-4 w-4" />
+              <span className="block text-sm font-bold">{avaliacaoSummary.reprovado}</span>
+              <span className="text-[11px] text-slate-500">Reprovar</span>
+            </button>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-slate-500" />
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Colaboradores</p>
+          </div>
+          <div className="mt-3 space-y-2">
+            <div className="rounded-xl border border-blue-900/60 bg-blue-950/20 px-3 py-2">
+              <p className="text-sm font-semibold text-blue-100">{topico.autor_nome}</p>
+              <p className="text-[11px] uppercase tracking-wide text-blue-300/70">Dono do post</p>
+            </div>
+            {collaborators.length === 0 ? (
+              <p className="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-3 text-sm text-slate-500">Ainda sem colaboradores.</p>
+            ) : collaborators.map((comment: any) => (
+              <div key={comment.autor_nome} className="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2">
+                <p className="text-sm font-semibold text-slate-200">{comment.autor_nome}</p>
+                <p className="text-[11px] text-slate-500">Comentou em {formatDate(comment.created_at)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        {topico.arquivos?.length > 0 && (
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Anexos do tópico</p>
+            <div className="mt-3 space-y-2">
+              {topico.arquivos.slice(0, 4).map((arquivo: any) => (
+                <ForumFileEmbed key={arquivo.id} {...arquivo} canDelete={false} />
+              ))}
+            </div>
+          </div>
+        )}
+        {topico.pastas?.length > 0 && (
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pastas vinculadas</p>
+            <div className="mt-3 space-y-2">
+              {topico.pastas.map((item: any) => item.pasta).filter(Boolean).slice(0, 5).map((pasta: any) => (
+                <a
+                  key={pasta.id}
+                  href={`/forum/documentos?pasta=${pasta.id}`}
+                  className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-300 transition hover:border-violet-700 hover:text-white"
+                >
+                  <FolderOpen className="h-4 w-4 shrink-0 text-violet-300" />
+                  <span className="min-w-0 flex-1 truncate">{pasta.nome}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+      </aside>
+      </div>
 
       {/* Modal de confirmação de exclusão */}
       {showDeleteConfirm && (
@@ -589,6 +788,17 @@ export default function TopicoPage() {
           </div>
         </AnimatedDialogFrame>
       )}
+    </div>
+    </div>
+  )
+}
+
+function ForumStat({ icon: Icon, label, value }: { icon: ElementType; label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+      <Icon className="mb-2 h-4 w-4 text-slate-500" />
+      <p className="text-lg font-bold text-white">{value}</p>
+      <p className="text-[11px] text-slate-500">{label}</p>
     </div>
   )
 }

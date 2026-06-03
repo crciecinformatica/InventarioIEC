@@ -13,6 +13,7 @@ import {
 } from "@/components/tables/device-overview-panel";
 import { PageHeader } from "@/components/layout/page-header";
 import { BoolBadge } from "@/components/dashboard/status-badge";
+import { ForumLinkedIndicator, useForumVinculosResumo } from "@/components/forum/forum-linked-indicator";
 import { ImpressoraModal } from "@/components/modals/impressora-modal";
 import { CriarImpressoraModal } from "@/components/modals/criar-impressora-modal";
 import { SetorSelect } from "@/components/modals/setor-select";
@@ -332,6 +333,8 @@ export default function ImpressorasPage() {
     };
   }, [refreshKey, localidadeIdFiltro]);
 
+  const forumResumo = useForumVinculosResumo("impressoras", data.map(item => item.id));
+
   const columns = useMemo<ColumnDef<Impressora, unknown>[]>(
     () => [
       {
@@ -413,8 +416,14 @@ export default function ImpressorasPage() {
           />
         ),
       },
+      {
+        id: "forum",
+        header: "Fórum",
+        enableSorting: false,
+        cell: ({ row }) => <ForumLinkedIndicator resumo={forumResumo[row.original.id]} />,
+      },
     ],
-    []
+    [forumResumo]
   );
 
   const filters = (

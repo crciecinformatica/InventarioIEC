@@ -234,7 +234,11 @@ export function NotebookModal({ notebook, onClose, onRefresh }: Props) {
 
  return (
   <>
-   <DeviceCommentsPopover tipoItem="notebooks" itemId={notebook.id} />
+   <DeviceCommentsPopover
+    tipoItem="notebooks"
+    itemId={notebook.id}
+    itemLabel={notebook.modelo ?? notebook.numero_patrimonio}
+   />
    <AnimatedDialogFrame onClose={onClose} className="flex max-h-[90vh] max-w-4xl flex-col rounded-2xl">
      {/* Header */}
      <div className="flex items-start justify-between p-5 border-b border-slate-100 dark:border-slate-800">

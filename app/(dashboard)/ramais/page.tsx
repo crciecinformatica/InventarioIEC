@@ -9,6 +9,7 @@ import { DataTable } from '@/components/tables/data-table'
 import { DeviceOverviewPanel, type OverviewFilter, notifyOverviewFilter } from '@/components/tables/device-overview-panel'
 import { PageHeader } from '@/components/layout/page-header'
 import { BoolBadge } from '@/components/dashboard/status-badge'
+import { ForumLinkedIndicator, useForumVinculosResumo } from '@/components/forum/forum-linked-indicator'
 import { RamalModal } from '@/components/modals/ramal-modal'
 import { CriarRamalModal } from '@/components/modals/criar-ramal-modal'
 import { Search, Plus } from 'lucide-react'
@@ -100,6 +101,7 @@ export default function RamaisPage() {
   const cancelledRef = useRef(false)
 
   function refresh() { setRefreshKey(k => k + 1) }
+  const forumResumo = useForumVinculosResumo('ramais', data.map(item => item.id))
 
   const columns = useMemo<ColumnDef<Ramal, unknown>[]>(() => [
     {
@@ -168,7 +170,13 @@ export default function RamaisPage() {
         )
       },
     },
-  ], [])
+    {
+      id: 'forum',
+      header: 'Fórum',
+      enableSorting: false,
+      cell: ({ row }) => <ForumLinkedIndicator resumo={forumResumo[row.original.id]} />,
+    },
+  ], [forumResumo])
 
   useEffect(() => {
     cancelledRef.current = false

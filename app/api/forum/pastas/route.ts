@@ -13,6 +13,29 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const parentId = searchParams.get('parent_id') || null
+    const flat = searchParams.get('flat') === '1'
+    const search = (searchParams.get('search') || '').trim()
+
+    if (flat) {
+      const pastas = await prisma.forum_pastas.findMany({
+        where: search
+          ? { nome: { contains: search, mode: 'insensitive' } }
+          : undefined,
+        orderBy: [{ parent_id: 'asc' }, { nome: 'asc' }],
+        take: 80,
+        include: {
+          parent: { select: { id: true, nome: true, parent_id: true } },
+          _count: { select: { filhos: true, arquivos: true } },
+        },
+      })
+
+      return NextResponse.json({
+        pastas: pastas.map(pasta => ({
+          ...pasta,
+          caminho: pasta.parent ? `${pasta.parent.nome} / ${pasta.nome}` : pasta.nome,
+        })),
+      })
+    }
 
     const [pastas, arquivos] = await Promise.all([
       prisma.forum_pastas.findMany({

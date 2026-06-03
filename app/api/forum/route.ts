@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { registrarAuditoria } from '@/lib/audit'
+import { FORUM_ETIQUETAS, normalizeForumEtiquetas } from '@/lib/forum'
 
 export const runtime = 'nodejs'
 
@@ -16,21 +17,26 @@ export async function GET(request: Request) {
     const limit  = parseInt(searchParams.get('limit') || '20', 10)
     const search = (searchParams.get('search') || '').trim()
     const filtro = searchParams.get('filtro') || 'todos' // todos | fixados | meus | vinculados
+    const etiqueta = searchParams.get('etiqueta') || ''
 
     const userId = (session.user as any).id as string
 
-    const where: any = {}
+    const baseWhere: any = {}
     if (search) {
-      where.OR = [
+      baseWhere.OR = [
         { titulo:   { contains: search, mode: 'insensitive' } },
         { conteudo: { contains: search, mode: 'insensitive' } },
       ]
     }
-    if (filtro === 'fixados')   where.fixado   = true
-    if (filtro === 'meus')      where.autor_id  = userId
-    if (filtro === 'vinculados') where.vinculos  = { some: {} }
+    if (filtro === 'fixados')   baseWhere.fixado   = true
+    if (filtro === 'meus')      baseWhere.autor_id  = userId
+    if (filtro === 'vinculados') baseWhere.vinculos  = { some: {} }
+    const where: any = { ...baseWhere }
+    if (FORUM_ETIQUETAS.includes(etiqueta as any)) {
+      where.etiquetas = { some: { etiqueta } }
+    }
 
-    const [data, total] = await Promise.all([
+    const [data, total, allCount, etiquetaGroups] = await Promise.all([
       prisma.forum_topicos.findMany({
         where,
         orderBy: [{ fixado: 'desc' }, { created_at: 'desc' }],
@@ -38,13 +44,37 @@ export async function GET(request: Request) {
         take: limit,
         include: {
           vinculos: { select: { tipo_item: true, item_id: true, item_label: true } },
-          _count: { select: { comentarios: true } },
+          arquivos: { select: { id: true, nome_original: true, tipo_arquivo: true, tamanho_bytes: true, url_publica: true } },
+          pastas: {
+            include: {
+              pasta: {
+                include: { _count: { select: { arquivos: true, filhos: true } } },
+              },
+            },
+          },
+          etiquetas: { select: { etiqueta: true } },
+          comentarios: {
+            orderBy: { created_at: 'desc' },
+            take: 2,
+            select: { id: true, autor_nome: true, conteudo: true, tipo: true, created_at: true },
+          },
+          _count: { select: { comentarios: true, arquivos: true } },
         },
       }),
       prisma.forum_topicos.count({ where }),
+      prisma.forum_topicos.count({ where: baseWhere }),
+      prisma.forum_topico_etiquetas.groupBy({
+        by: ['etiqueta'],
+        where: { topico: baseWhere },
+        _count: { etiqueta: true },
+      }),
     ])
+    const counts = {
+      all: allCount,
+      etiquetas: Object.fromEntries(etiquetaGroups.map(item => [item.etiqueta, item._count.etiqueta])),
+    }
 
-    return NextResponse.json({ data, total, page, totalPages: Math.ceil(total / limit) })
+    return NextResponse.json({ data, total, counts, page, totalPages: Math.ceil(total / limit) })
   } catch (err) {
     console.error('[GET /api/forum]', err)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -58,7 +88,11 @@ export async function POST(request: Request) {
 
     const userId   = (session.user as any).id as string
     const userName = session.user?.name ?? 'Usuário'
-    const { titulo, conteudo, vinculos = [], arquivo_ids = [] } = await request.json()
+    const { titulo, conteudo, vinculos = [], arquivo_ids = [], pasta_ids = [], etiquetas } = await request.json()
+    const safeEtiquetas = normalizeForumEtiquetas(etiquetas)
+    const safePastaIds = Array.isArray(pasta_ids)
+      ? Array.from(new Set(pasta_ids.filter((id: unknown): id is string => typeof id === 'string' && Boolean(id))))
+      : []
 
     if (!titulo?.trim()) return NextResponse.json({ error: 'Título obrigatório' }, { status: 400 })
     if (!conteudo?.trim()) return NextResponse.json({ error: 'Conteúdo obrigatório' }, { status: 400 })
@@ -76,10 +110,18 @@ export async function POST(request: Request) {
             item_label: v.item_label,
           })),
         } : undefined,
+        etiquetas: {
+          create: safeEtiquetas.map(etiqueta => ({ etiqueta })),
+        },
+        pastas: safePastaIds.length > 0 ? {
+          create: safePastaIds.map(pasta_id => ({ pasta_id })),
+        } : undefined,
       },
       include: {
         vinculos: true,
         arquivos: true,
+        pastas: { include: { pasta: { include: { _count: { select: { arquivos: true, filhos: true } } } } } },
+        etiquetas: true,
         _count: { select: { comentarios: true } },
       },
     })
@@ -96,6 +138,8 @@ export async function POST(request: Request) {
         include: {
           vinculos: true,
           arquivos: true,
+          pastas: { include: { pasta: { include: { _count: { select: { arquivos: true, filhos: true } } } } } },
+          etiquetas: true,
           _count: { select: { comentarios: true } },
         },
       })

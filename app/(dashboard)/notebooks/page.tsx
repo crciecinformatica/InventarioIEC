@@ -16,6 +16,7 @@ import {
 
 import { PageHeader } from "@/components/layout/page-header";
 import { CategoriaBadge } from "@/components/dashboard/status-badge";
+import { ForumLinkedIndicator, useForumVinculosResumo } from "@/components/forum/forum-linked-indicator";
 
 import { NotebookModal } from "@/components/modals/notebook-modal";
 import { CriarNotebookModal } from "@/components/modals/criar-notebook-modal";
@@ -249,6 +250,7 @@ export default function NotebooksPage() {
         Math.ceil(filteredOverviewData.length / 20),
       )
     : totalPages;
+  const forumResumo = useForumVinculosResumo("notebooks", tableData.map(item => item.id));
 
   function applyOverviewFilter(filter: OverviewFilter) {
     if (filter.kind === "all") {
@@ -610,8 +612,14 @@ export default function NotebooksPage() {
           );
         },
       },
+      {
+        id: "forum",
+        header: "Fórum",
+        enableSorting: false,
+        cell: ({ row }) => <ForumLinkedIndicator resumo={forumResumo[row.original.id]} />,
+      },
     ],
-    [],
+    [forumResumo],
   );
 
   const inputCls =
