@@ -32,10 +32,8 @@ export function VinculosSection({ vinculos, compact = false }: { vinculos: Vincu
       setOpenGroup(null)
       setAnchor(null)
     }
-    window.addEventListener('scroll', close, true)
     window.addEventListener('resize', close)
     return () => {
-      window.removeEventListener('scroll', close, true)
       window.removeEventListener('resize', close)
     }
   }, [openGroup])
@@ -90,7 +88,7 @@ export function VinculosSection({ vinculos, compact = false }: { vinculos: Vincu
                     }
                     const rect = event.currentTarget.getBoundingClientRect()
                     setAnchor({
-                      top: Math.min(rect.bottom + 8, window.innerHeight - 336),
+                      top: Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - 336)),
                       left: Math.min(Math.max(12, rect.left), window.innerWidth - 340),
                     })
                     setOpenGroup(group.tipo)
@@ -139,7 +137,7 @@ export function VinculosSection({ vinculos, compact = false }: { vinculos: Vincu
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <div className="max-h-72 overflow-y-auto p-2">
+                      <div className="max-h-[min(18rem,calc(100vh-8rem))] overscroll-contain overflow-y-auto p-2">
                         {open.items.map(item => (
                           <button
                             key={`${item.tipo_item}-${item.item_id}`}
