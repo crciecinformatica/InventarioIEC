@@ -1,7 +1,7 @@
 "use client";
 
 import { usePermission } from "@/hooks/use-permission";
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AnimatePresence } from "motion/react";
 import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/tables/data-table";
@@ -12,6 +12,7 @@ import {
 } from "@/components/tables/device-overview-panel";
 import { PageHeader } from "@/components/layout/page-header";
 import { BoolBadge } from "@/components/dashboard/status-badge";
+import { ForumLinkedIndicator, useForumVinculosResumo } from "@/components/forum/forum-linked-indicator";
 import { AparelhoModal } from "@/components/modals/aparelho-modal";
 import { SetorSelect } from "@/components/modals/setor-select";
 import { LocalidadeSelect } from "@/components/modals/localidade-select";
@@ -47,7 +48,7 @@ function hasMissingPhoneData(item: Aparelho) {
   );
 }
 
-const columns: ColumnDef<Aparelho>[] = [
+const baseColumns: ColumnDef<Aparelho>[] = [
   {
     accessorKey: "modelo",
     enableSorting: true,
@@ -345,6 +346,26 @@ export default function AparelhosPage() {
         Math.ceil(filteredOverviewData.length / 20),
       )
     : totalPages;
+  const forumResumo = useForumVinculosResumo(
+    "aparelhos",
+    tableData.map((item) => item.id),
+  );
+  const columns = useMemo<ColumnDef<Aparelho>[]>(
+    () => [
+      ...baseColumns,
+      {
+        id: "forum",
+        header: "Fórum",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <ForumLinkedIndicator
+            resumo={forumResumo[row.original.id]}
+          />
+        ),
+      },
+    ],
+    [forumResumo],
+  );
 
   function applyOverviewFilter(
     filter: OverviewFilter,

@@ -23,6 +23,7 @@ model usuarios {
   forum_topicos     forum_topicos[]
   forum_arquivos    forum_arquivos[]
   forum_pastas      forum_pastas[]
+  forum_avaliacoes  forum_topico_avaliacoes[]
 
   @@index([codigo_pessoa], map: "idx_usuarios_codigo_pessoa")
 }
@@ -396,6 +397,48 @@ model forum_topicos {
   autor       usuarios?           @relation(fields: [autor_id], references: [id])
   vinculos    forum_vinculos[]
   arquivos    forum_arquivos[]
+  etiquetas   forum_topico_etiquetas[]
+  avaliacoes  forum_topico_avaliacoes[]
+  pastas      forum_topico_pastas[]
+}
+
+model forum_topico_etiquetas {
+  id         String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  topico_id  String         @db.Uuid
+  etiqueta   String
+  created_at DateTime?      @default(now()) @db.Timestamptz(6)
+  topico     forum_topicos  @relation(fields: [topico_id], references: [id], onDelete: Cascade)
+
+  @@unique([topico_id, etiqueta], map: "forum_topico_etiquetas_topico_id_etiqueta_key")
+  @@index([etiqueta], map: "idx_forum_topico_etiquetas_etiqueta")
+  @@index([topico_id], map: "idx_forum_topico_etiquetas_topico_id")
+}
+
+model forum_topico_avaliacoes {
+  id         String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  topico_id  String        @db.Uuid
+  usuario_id String        @db.Uuid
+  tipo       String
+  created_at DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at DateTime?     @default(now()) @db.Timestamptz(6)
+  topico     forum_topicos @relation(fields: [topico_id], references: [id], onDelete: Cascade)
+  usuario    usuarios      @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@unique([topico_id, usuario_id], map: "forum_topico_avaliacoes_topico_id_usuario_id_key")
+  @@index([topico_id, tipo], map: "idx_forum_topico_avaliacoes_topico_tipo")
+}
+
+model forum_topico_pastas {
+  id         String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  topico_id  String        @db.Uuid
+  pasta_id   String        @db.Uuid
+  created_at DateTime?     @default(now()) @db.Timestamptz(6)
+  topico     forum_topicos @relation(fields: [topico_id], references: [id], onDelete: Cascade)
+  pasta      forum_pastas  @relation(fields: [pasta_id], references: [id], onDelete: Cascade)
+
+  @@unique([topico_id, pasta_id], map: "forum_topico_pastas_topico_id_pasta_id_key")
+  @@index([topico_id], map: "idx_forum_topico_pastas_topico_id")
+  @@index([pasta_id], map: "idx_forum_topico_pastas_pasta_id")
 }
 
 model forum_comentarios {
@@ -479,10 +522,24 @@ model forum_pastas {
   parent      forum_pastas?      @relation("SubPastas", fields: [parent_id], references: [id], onDelete: Cascade)
   filhos      forum_pastas[]     @relation("SubPastas")
   arquivos    forum_arquivos[]
+  topicos     forum_topico_pastas[]
+  pipelines   forum_pipeline_pastas[]
   criador     usuarios?          @relation(fields: [criado_por], references: [id], onDelete: SetNull)
 
   @@index([parent_id], map: "idx_forum_pastas_parent_id")
   @@index([criado_por], map: "idx_forum_pastas_criado_por")
+}
+
+model forum_pipeline_pastas {
+  id         String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  etiqueta   String
+  pasta_id   String        @db.Uuid
+  created_at DateTime?     @default(now()) @db.Timestamptz(6)
+  pasta      forum_pastas  @relation(fields: [pasta_id], references: [id], onDelete: Cascade)
+
+  @@unique([etiqueta, pasta_id], map: "forum_pipeline_pastas_etiqueta_pasta_id_key")
+  @@index([etiqueta], map: "idx_forum_pipeline_pastas_etiqueta")
+  @@index([pasta_id], map: "idx_forum_pipeline_pastas_pasta_id")
 }
 
 enum categoria_equipamento {

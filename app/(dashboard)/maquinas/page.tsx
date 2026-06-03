@@ -8,6 +8,7 @@ import { DataTable } from '@/components/tables/data-table'
 import { DeviceOverviewPanel, type OverviewFilter, notifyOverviewFilter } from '@/components/tables/device-overview-panel'
 import { PageHeader } from '@/components/layout/page-header'
 import { CategoriaBadge } from '@/components/dashboard/status-badge'
+import { ForumLinkedIndicator, useForumVinculosResumo } from '@/components/forum/forum-linked-indicator'
 import { MaquinaModal } from '@/components/modals/maquina-modal'
 import { CriarMaquinaModal } from '@/components/modals/criar-maquina-modal'
 import { SetorSelect } from '@/components/modals/setor-select'
@@ -161,6 +162,7 @@ export default function MaquinasPage() {
     : data
   const tableTotal = filteredOverviewData?.length ?? total
   const tableTotalPages = filteredOverviewData ? Math.max(1, Math.ceil(filteredOverviewData.length / 20)) : totalPages
+  const forumResumo = useForumVinculosResumo('maquinas', tableData.map(item => item.id))
 
   function applyOverviewFilter(filter: OverviewFilter) {
     if (filter.kind === 'all') {
@@ -304,7 +306,13 @@ export default function MaquinasPage() {
         )
       },
     },
-  ], [])
+    {
+      id: 'forum',
+      header: 'Fórum',
+      enableSorting: false,
+      cell: ({ row }) => <ForumLinkedIndicator resumo={forumResumo[row.original.id]} />,
+    },
+  ], [forumResumo])
 
   const inputCls = "px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
 

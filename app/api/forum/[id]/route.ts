@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { registrarAuditoria } from '@/lib/audit'
+import { sanitizeForumEtiquetas } from '@/lib/forum'
 
 export const runtime = 'nodejs'
 type Props = { params: Promise<{ id: string }> }
@@ -18,6 +19,9 @@ export async function GET(_: Request, { params }: Props) {
       where: { id },
       include: {
         vinculos: true,
+        pastas: { include: { pasta: { include: { _count: { select: { arquivos: true, filhos: true } } } } } },
+        etiquetas: true,
+        avaliacoes: { select: { usuario_id: true, tipo: true } },
         arquivos: true, // <-- ADICIONADO: Traz as imagens anexadas no tópico
         comentarios: {
           orderBy: { created_at: 'asc' },
@@ -53,6 +57,8 @@ export async function PATCH(request: Request, { params }: Props) {
     if (!topico) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 })
     const vinculosAntes = await prisma.forum_vinculos.findMany({ where: { topico_id: id } })
     const arquivosAntes = await prisma.forum_arquivos.findMany({ where: { topico_id: id } })
+    const etiquetasAntes = await prisma.forum_topico_etiquetas.findMany({ where: { topico_id: id } })
+    const pastasAntes = await prisma.forum_topico_pastas.findMany({ where: { topico_id: id }, include: { pasta: true } })
 
     // Só autor ou admin pode editar título/conteúdo
     const isAdmin  = perfil === 'admin'
@@ -83,6 +89,30 @@ export async function PATCH(request: Request, { params }: Props) {
       }
     }
 
+    if ((isAutor || isAdmin) && Array.isArray(body.etiquetas)) {
+      const etiquetas = sanitizeForumEtiquetas(body.etiquetas)
+      await prisma.forum_topico_etiquetas.deleteMany({ where: { topico_id: id } })
+      if (etiquetas.length > 0) {
+        await prisma.forum_topico_etiquetas.createMany({
+          data: etiquetas.map(etiqueta => ({ topico_id: id, etiqueta })),
+          skipDuplicates: true,
+        })
+      }
+    }
+
+    if ((isAutor || isAdmin) && Array.isArray(body.pasta_ids)) {
+      const pastaIds: string[] = Array.from(new Set(
+        body.pasta_ids.filter((item: unknown): item is string => typeof item === 'string' && Boolean(item)),
+      ))
+      await prisma.forum_topico_pastas.deleteMany({ where: { topico_id: id } })
+      if (pastaIds.length > 0) {
+        await prisma.forum_topico_pastas.createMany({
+          data: pastaIds.map(pasta_id => ({ topico_id: id, pasta_id })),
+          skipDuplicates: true,
+        })
+      }
+    }
+
     // 2. <-- ADICIONADO: Lógica para Arquivos
     // Se recebeu um array de arquivo_ids (do upload de novas imagens na edição)
     if (Array.isArray(body.arquivo_ids) && body.arquivo_ids.length > 0) {
@@ -94,7 +124,12 @@ export async function PATCH(request: Request, { params }: Props) {
 
     const topicoAtualizado = await prisma.forum_topicos.findUnique({
       where: { id },
-      include: { vinculos: true, arquivos: true },
+      include: {
+        vinculos: true,
+        arquivos: true,
+        etiquetas: true,
+        pastas: { include: { pasta: { include: { _count: { select: { arquivos: true, filhos: true } } } } } },
+      },
     })
     const descricao = [
       body.fixado !== undefined && topico.fixado !== body.fixado
@@ -103,7 +138,7 @@ export async function PATCH(request: Request, { params }: Props) {
       body.fechado !== undefined && topico.fechado !== body.fechado
         ? (body.fechado ? 'Tópico fechado' : 'Tópico reaberto')
         : null,
-      body.titulo || body.conteudo || Array.isArray(body.vinculos) || Array.isArray(body.arquivo_ids)
+      body.titulo || body.conteudo || Array.isArray(body.vinculos) || Array.isArray(body.arquivo_ids) || Array.isArray(body.etiquetas) || Array.isArray(body.pasta_ids)
         ? `Tópico "${updated.titulo}" atualizado`
         : null,
     ].filter(Boolean).join(' · ') || `Tópico "${updated.titulo}" atualizado`
@@ -113,7 +148,7 @@ export async function PATCH(request: Request, { params }: Props) {
       registro_id: id,
       acao: 'UPDATE',
       descricao,
-      dados_anteriores: { ...topico, vinculos: vinculosAntes, arquivos: arquivosAntes } as any,
+      dados_anteriores: { ...topico, vinculos: vinculosAntes, arquivos: arquivosAntes, etiquetas: etiquetasAntes, pastas: pastasAntes } as any,
       dados_novos: topicoAtualizado as any,
       usuario_id: userId,
       usuario_nome: userName,
@@ -141,6 +176,9 @@ export async function DELETE(_: Request, { params }: Props) {
       include: {
         vinculos: true,
         arquivos: true,
+        etiquetas: true,
+        pastas: { include: { pasta: true } },
+        avaliacoes: true,
         comentarios: { include: { vinculos: true, arquivos: true, reacoes: true } },
       },
     })

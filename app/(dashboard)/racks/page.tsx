@@ -15,6 +15,7 @@ import {
 } from "@/components/tables/device-overview-panel";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { ForumLinkedIndicator, useForumVinculosResumo } from "@/components/forum/forum-linked-indicator";
 import { RackModal } from "@/components/modals/rack-modal";
 import { CriarRackModal } from "@/components/modals/criar-rack-modal";
 import { SetorSelect } from "@/components/modals/setor-select";
@@ -76,6 +77,7 @@ export default function RacksPage() {
   function refresh() {
     setRefreshKey((k) => k + 1);
   }
+  const forumResumo = useForumVinculosResumo("racks", data.map(item => item.id));
 
   const columns = useMemo<ColumnDef<Rack, unknown>[]>(
     () => [
@@ -156,8 +158,14 @@ export default function RacksPage() {
           );
         },
       },
+      {
+        id: "forum",
+        header: "Fórum",
+        enableSorting: false,
+        cell: ({ row }) => <ForumLinkedIndicator resumo={forumResumo[row.original.id]} />,
+      },
     ],
-    [],
+    [forumResumo],
   );
 
   useEffect(() => {
