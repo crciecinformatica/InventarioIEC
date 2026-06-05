@@ -29,6 +29,7 @@ interface Arquivo {
   tamanho_bytes: number
   url_publica: string
   usuario_id: string | null
+  enviado_por_nome: string
   created_at: string | null
 }
 
@@ -48,6 +49,14 @@ function getFileIcon(mime?: string | null) {
   if (mime.startsWith('image/'))   return <FileImage className="w-5 h-5 text-blue-500" />
   if (mime === 'application/pdf')  return <FileText className="w-5 h-5 text-red-500" />
   return <File className="w-5 h-5 text-slate-400" />
+}
+
+function getDownloadHref(arq: Arquivo) {
+  return `/api/forum/arquivos/${arq.id}/download/${encodeURIComponent(arq.nome_original)}`
+}
+
+function getPreviewHref(arq: Arquivo) {
+  return `/api/forum/arquivos/${arq.id}/preview/${encodeURIComponent(arq.nome_original)}`
 }
 
 export default function DocumentosPage() {
@@ -345,18 +354,18 @@ export default function DocumentosPage() {
                     <div className="flex min-w-0 items-center gap-2.5 md:col-span-6">
                       {getFileIcon(arq.tipo_arquivo)}
                       <div className="min-w-0">
-                        <a href={arq.url_publica} target="_blank" rel="noopener noreferrer"
+                        <a href={getPreviewHref(arq)} target="_blank" rel="noopener noreferrer"
                           className="block truncate text-sm font-medium text-slate-200 transition hover:text-blue-400">
                           {arq.nome_original}
                         </a>
                       </div>
                     </div>
-                    <span className="truncate text-xs text-slate-500 md:col-span-2">{arq.usuario_id}</span>
+                    <span className="truncate text-xs text-slate-500 md:col-span-2">{arq.enviado_por_nome}</span>
                     <span className="text-xs text-slate-400 md:col-span-2">{formatDate(arq.created_at)}</span>
                     <div className="flex items-center justify-between md:col-span-2">
                       <span className="text-xs text-slate-400">{formatSize(arq.tamanho_bytes)}</span>
                       <div className="flex gap-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
-                        <a href={arq.url_publica} download target="_blank" rel="noopener noreferrer"
+                        <a href={getDownloadHref(arq)} download={arq.nome_original}
                           className="p-1 rounded text-slate-400 hover:text-blue-500 transition">
                           <Download className="w-3.5 h-3.5" />
                         </a>
