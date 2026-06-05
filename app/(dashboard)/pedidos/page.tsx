@@ -8,6 +8,11 @@ import {
   Check,
   CheckCircle2,
   Clock3,
+  Database,
+  Download,
+  File,
+  FileImage,
+  FileUp,
   FileText,
   GitPullRequest,
   Loader2,
@@ -32,6 +37,7 @@ import {
 type JsonRecord = Record<string, unknown>
 
 type PedidoStatus = 'pendente' | 'aprovada' | 'recusada'
+type PedidoKind = 'inventario' | 'upload'
 
 type Pedido = {
   id: string
@@ -71,6 +77,7 @@ type InspectTarget = {
   id: string
   title: string
   subtitle?: string
+  href?: string
 }
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -85,6 +92,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   alocacoes_notebooks: 'Alocações — Notebooks',
   alocacoes_aparelhos: 'Alocações — Aparelhos',
   alocacoes_ramais: 'Alocações — Ramais',
+  forum_arquivos: 'Uploads de arquivos',
 }
 
 const ACTION_LABELS: Record<string, string> = {
@@ -94,6 +102,22 @@ const ACTION_LABELS: Record<string, string> = {
   ALLOCATE: 'Alocação',
   DEALLOCATE: 'Desalocação',
   CORRECTION: 'Correção',
+  UPLOAD: 'Upload de arquivo',
+}
+
+const KIND_META: Record<PedidoKind, { label: string; description: string; tone: string; icon: typeof Database }> = {
+  inventario: {
+    label: 'Inventário',
+    description: 'Alterações de dispositivos, vínculos e cadastros',
+    tone: 'border-blue-500/30 bg-blue-500/10 text-blue-100',
+    icon: Database,
+  },
+  upload: {
+    label: 'Arquivos',
+    description: 'Arquivos enviados para Documentos do Fórum',
+    tone: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-100',
+    icon: FileUp,
+  },
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -126,6 +150,10 @@ const FIELD_LABELS: Record<string, string> = {
   observacoes: 'Observações',
   tipo_uso: 'Tipo de uso',
   tipo_posse: 'Tipo de posse',
+  nome_original: 'Arquivo',
+  pasta_nome: 'Pasta',
+  tipo_arquivo: 'Tipo',
+  tamanho_bytes: 'Tamanho',
 }
 
 const DISPLAY_ONLY_KEYS = new Set([
@@ -155,6 +183,11 @@ const DISPLAY_ONLY_KEYS = new Set([
   'alocacao_ativa',
   'alocacoes_ativas',
   '_count',
+  'nome_armazenado',
+  'url_publica',
+  'usuario_id',
+  'enviado_por_nome',
+  'pasta_id',
 ])
 
 const STATUS_META: Record<PedidoStatus, { label: string; tone: string; icon: typeof Clock3 }> = {
@@ -205,6 +238,11 @@ function relationLabel(source: JsonRecord, key: string) {
 }
 
 function formatValue(value: unknown, key: string, source: JsonRecord) {
+  if (key === 'tamanho_bytes' && typeof value === 'number') {
+    if (value < 1024) return `${value} B`
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`
+  }
   if (key.endsWith('_id')) {
     const label = relationLabel(source, key)
     if (label) return label
@@ -230,9 +268,37 @@ function formatValue(value: unknown, key: string, source: JsonRecord) {
   return String(value)
 }
 
+function pedidoKind(pedido: Pedido): PedidoKind {
+  return pedido.tipo_recurso === 'forum_arquivos' ? 'upload' : 'inventario'
+}
+
+function getPedidoArquivoInfo(pedido: Pedido) {
+  if (pedido.tipo_recurso !== 'forum_arquivos' || pedido.acao !== 'UPLOAD') return null
+  const dados = pedido.dados_propostos ?? {}
+  const nome = typeof dados.nome_original === 'string' ? dados.nome_original : ''
+  if (!nome) return null
+
+  return {
+    nome,
+    tipo: typeof dados.tipo_arquivo === 'string' ? dados.tipo_arquivo : '',
+    tamanho: formatValue(dados.tamanho_bytes, 'tamanho_bytes', dados),
+    href: `/api/solicitacoes-inventario/${pedido.id}/arquivo`,
+  }
+}
+
+function renderPedidoArquivoIcon(mime: string) {
+  if (mime.startsWith('image/')) return <FileImage className="h-5 w-5" />
+  if (mime === 'application/pdf') return <FileText className="h-5 w-5" />
+  return <File className="h-5 w-5" />
+}
+
 function reviewKeys(pedido: Pedido) {
   const previous = pedido.dados_anteriores ?? {}
   const next = pedido.dados_propostos ?? {}
+  if (pedido.tipo_recurso === 'forum_arquivos' && pedido.acao === 'UPLOAD') {
+    return ['nome_original', 'pasta_nome', 'tipo_arquivo', 'tamanho_bytes'].filter(key => key in next)
+  }
+
   const proposedKeys = Object.keys(next).filter(key => !DISPLAY_ONLY_KEYS.has(key))
 
   if (pedido.acao === 'DELETE' || pedido.acao === 'DEALLOCATE') {
@@ -275,6 +341,8 @@ function targetLabel(pedido: Pedido) {
     previous.nome_switch,
     previous.numero_patrimonio,
     previous.modelo,
+    previous.nome_original,
+    previous.pasta_nome,
     next.endereco_ip,
     next.nome_host,
     next.nome,
@@ -282,6 +350,8 @@ function targetLabel(pedido: Pedido) {
     next.nome_switch,
     next.numero_patrimonio,
     next.modelo,
+    next.nome_original,
+    next.pasta_nome,
   ]
   const match = candidates.find(value => value !== null && value !== undefined && String(value).trim())
   return match ? String(match) : RESOURCE_LABELS[pedido.tipo_recurso] ?? pedido.tipo_recurso
@@ -289,6 +359,12 @@ function targetLabel(pedido: Pedido) {
 
 function requestSummary(pedido: Pedido) {
   const rows = diffRows(pedido)
+  if (pedido.tipo_recurso === 'forum_arquivos' && pedido.acao === 'UPLOAD') {
+    const next = pedido.dados_propostos ?? {}
+    const fileName = String(next.nome_original ?? 'arquivo')
+    const folderName = String(next.pasta_nome ?? 'Documentos')
+    return `Enviar "${fileName}" para ${folderName}`
+  }
   if (pedido.acao === 'DELETE') return `Excluir ${targetLabel(pedido)}`
   if (pedido.acao === 'DEALLOCATE') return `Encerrar vínculo de ${targetLabel(pedido)}`
   if (rows.length === 0) return 'Sem mudanças estruturadas detectadas'
@@ -360,11 +436,28 @@ function getPedidoInspectTarget(pedido: Pedido): InspectTarget | null {
     }
   }
 
+  if (pedido.tipo_recurso === 'forum_arquivos') {
+    const pastaId = firstString(next.pasta_id, previous.pasta_id)
+    if (pastaId) {
+      const pastaNome = firstString(next.pasta_nome, previous.pasta_nome) || 'Documentos'
+      const params = new URLSearchParams()
+      params.set('pasta', pastaId)
+      return {
+        path: '/forum/documentos',
+        id: pastaId,
+        title: pastaNome,
+        subtitle: 'Documentos do Fórum',
+        href: buildHref('/forum/documentos', params),
+      }
+    }
+  }
+
   return null
 }
 
 function buildContextRows(pedido: Pedido) {
   return [
+    ['Categoria', KIND_META[pedidoKind(pedido)].label],
     ['Recurso', targetLabel(pedido)],
     ['Ação', ACTION_LABELS[pedido.acao] ?? pedido.acao],
   ]
@@ -406,6 +499,7 @@ export default function PedidosPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<PedidoStatus | 'pendente' | 'aprovada' | 'recusada' | ''>('pendente')
+  const [kindFilter, setKindFilter] = useState<PedidoKind | ''>('')
   const [actionFilter, setActionFilter] = useState('')
   const [selected, setSelected] = useState<Pedido | null>(null)
   const [reviewingId, setReviewingId] = useState<string | null>(null)
@@ -437,6 +531,16 @@ export default function PedidosPage() {
     const target = getPedidoInspectTarget(pedido)
     if (!target) {
       notifyPedidoToast('Sem item vinculado', 'Este pedido ainda não aponta para um registro navegável.', '#f59e0b')
+      return
+    }
+
+    if (target.href) {
+      writePendingInspectPreview(window.sessionStorage, target.href, inferInspectPreview({
+        id: target.id,
+        nome: target.title,
+        descricao: target.subtitle,
+      }))
+      router.push(target.href)
       return
     }
 
@@ -513,24 +617,30 @@ export default function PedidosPage() {
       aprovada: pedidos.filter(pedido => pedido.status === 'aprovada').length,
       recusada: pedidos.filter(pedido => pedido.status === 'recusada').length,
     }
+    const byKind = {
+      inventario: pedidos.filter(pedido => pedidoKind(pedido) === 'inventario').length,
+      upload: pedidos.filter(pedido => pedidoKind(pedido) === 'upload').length,
+    }
     const byAction = Object.keys(ACTION_LABELS).map(action => ({
       action,
       label: ACTION_LABELS[action],
       count: pedidos.filter(pedido => pedido.acao === action).length,
     }))
 
-    return { byStatus, byAction }
+    return { byStatus, byKind, byAction }
   }, [pedidos])
 
   const filtered = useMemo(() => {
     return pedidos.filter(pedido => {
       if (statusFilter && pedido.status !== statusFilter) return false
+      if (kindFilter && pedidoKind(pedido) !== kindFilter) return false
       if (actionFilter && pedido.acao !== actionFilter) return false
       return true
     })
-  }, [pedidos, statusFilter, actionFilter])
+  }, [pedidos, statusFilter, kindFilter, actionFilter])
   const selectedContextRows = selected ? buildContextRows(selected) : []
   const selectedTarget = selected ? getPedidoInspectTarget(selected) : null
+  const selectedArquivo = selected ? getPedidoArquivoInfo(selected) : null
 
   async function review(pedido: Pedido, decisao: 'aprovar' | 'recusar') {
     setReviewingId(pedido.id)
@@ -575,8 +685,8 @@ export default function PedidosPage() {
         <h1 className="text-xl font-bold text-white">{isAdmin ? 'Pedidos' : 'Meus pedidos'}</h1>
         <p className="mt-1 text-sm text-slate-400">
           {isAdmin
-            ? 'Solicitações de alteração aguardando revisão administrativa'
-            : 'Acompanhe as alterações de inventário que você solicitou'}
+            ? 'Solicitações aguardando revisão administrativa'
+            : 'Acompanhe as solicitações que você enviou para aprovação'}
         </p>
         <p className="mt-1 text-sm text-slate-500">{filtered.length} registro(s)</p>
       </div>
@@ -585,15 +695,16 @@ export default function PedidosPage() {
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Overview</p>
-            <h2 className="text-base font-semibold text-white">Pedidos inventário</h2>
+            <h2 className="text-base font-semibold text-white">Fila de pedidos</h2>
           </div>
-          {(statusFilter || actionFilter) && (
+          {(statusFilter || kindFilter || actionFilter) && (
             <button
               type="button"
               onClick={() => {
                 setStatusFilter('')
+                setKindFilter('')
                 setActionFilter('')
-                notifyPedidoToast('Pedidos em visão geral', 'Todos os status e ações voltaram a aparecer.', '#3b82f6')
+                notifyPedidoToast('Pedidos em visão geral', 'Todos os filtros voltaram a aparecer.', '#3b82f6')
               }}
               className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
             >
@@ -603,7 +714,45 @@ export default function PedidosPage() {
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,0.65fr)_minmax(0,1.35fr)]">
-          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+            {(Object.keys(KIND_META) as PedidoKind[]).map(kind => {
+              const meta = KIND_META[kind]
+              const Icon = meta.icon
+              const active = kindFilter === kind
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => {
+                    setKindFilter(active ? '' : kind)
+                    notifyPedidoToast(
+                      active ? 'Filtro removido' : meta.label,
+                      active ? 'Todos os tipos de pedido voltaram a aparecer.' : meta.description,
+                      kind === 'upload' ? '#06b6d4' : '#3b82f6',
+                    )
+                  }}
+                  className={cn(
+                    'flex min-h-16 items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition',
+                    active ? meta.tone : 'border-slate-800 bg-slate-950/70 text-slate-300 hover:border-slate-700',
+                  )}
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className={cn(
+                      'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border',
+                      active ? 'border-current/30 bg-white/5' : 'border-slate-800 bg-slate-900 text-slate-400',
+                    )}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="truncate text-sm font-semibold">{meta.label}</span>
+                  </div>
+                  <span className="shrink-0 text-2xl font-bold text-white">{overview.byKind[kind]}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]">
+            <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
             {(Object.keys(STATUS_META) as PedidoStatus[]).map(status => {
               const meta = STATUS_META[status]
               const Icon = meta.icon
@@ -614,7 +763,6 @@ export default function PedidosPage() {
                   type="button"
                   onClick={() => {
                     setStatusFilter(active ? '' : status)
-                    setActionFilter('')
                     notifyPedidoToast(
                       active ? 'Filtro removido' : meta.label,
                       active ? 'Todos os status voltaram a aparecer.' : `Mostrando somente pedidos ${meta.label.toLowerCase()}.`,
@@ -634,9 +782,9 @@ export default function PedidosPage() {
                 </button>
               )
             })}
-          </div>
+            </div>
 
-          <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
             <div className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
               <GitPullRequest className="h-3.5 w-3.5" />
               Ações solicitadas
@@ -671,6 +819,7 @@ export default function PedidosPage() {
                   </button>
                 )
               })}
+            </div>
             </div>
           </div>
         </div>
@@ -859,6 +1008,36 @@ export default function PedidosPage() {
                   ))}
                 </div>
               </section>
+
+              {selectedArquivo && (
+                <section className="mb-3 rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Arquivo para verificação</p>
+                      <p className="mt-1 text-xs text-slate-400">Confira o anexo antes de aprovar o pedido.</p>
+                    </div>
+                    <a
+                      href={selectedArquivo.href}
+                      download={selectedArquivo.nome}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/40 px-2.5 py-1.5 text-xs font-semibold text-blue-200 transition hover:bg-blue-500/10"
+                    >
+                      Baixar
+                      <Download className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/75 p-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-950 text-blue-300">
+                      {renderPedidoArquivoIcon(selectedArquivo.tipo)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-white">{selectedArquivo.nome}</p>
+                      <p className="mt-1 truncate text-xs text-slate-500">
+                        {[selectedArquivo.tipo, selectedArquivo.tamanho].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              )}
 
               <AnimatePresence initial={false}>
                 {chatOpen && (

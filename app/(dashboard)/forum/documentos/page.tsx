@@ -11,6 +11,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
 import { pushInspectHistory } from '@/lib/navigation-context'
+import { useSolicitacaoInventarioConfirm } from '@/components/solicitacoes-inventario/solicitacao-confirm-provider'
 
 interface Pasta {
   id: string
@@ -66,6 +67,7 @@ export default function DocumentosPage() {
   const pastaParam = searchParams.get('pasta')
   const perfil = (session?.user as any)?.perfil as string
   const isAdmin = perfil === 'admin'
+  const confirmSolicitacao = useSolicitacaoInventarioConfirm()
 
   const [pastas, setPastas]         = useState<Pasta[]>([])
   const [arquivos, setArquivos]     = useState<Arquivo[]>([])
@@ -173,12 +175,23 @@ export default function DocumentosPage() {
   // Upload
   async function handleUpload() {
     if (!uploadFile || !currentId) return
+    let comentario = uploadDesc
+    if (!isAdmin) {
+      const solicitacao = await confirmSolicitacao({
+        title: 'Solicitar aprovação de upload?',
+        description: 'O arquivo será enviado para revisão e só ficará disponível em Documentos após aprovação administrativa.',
+      })
+      if (!solicitacao.confirmed) return
+      comentario = solicitacao.comentario || uploadDesc
+    }
+
     setUploading(true)
     setUploadProgress(10)
     try {
       const formData = new FormData()
       formData.append('file', uploadFile)
       if (uploadDesc) formData.append('descricao', uploadDesc)
+      if (comentario) formData.append('comentario', comentario)
 
       setUploadProgress(40)
       const res = await fetch(`/api/forum/pastas/${currentId}/upload`, {
@@ -193,7 +206,8 @@ export default function DocumentosPage() {
       }
 
       setUploadProgress(100)
-      toast.success('Arquivo enviado!')
+      const json = await res.json().catch(() => ({}))
+      toast.success(json.pending_approval ? 'Pedido de upload enviado para aprovação.' : 'Arquivo enviado!')
       setShowUpload(false)
       setUploadFile(null)
       setUploadDesc('')

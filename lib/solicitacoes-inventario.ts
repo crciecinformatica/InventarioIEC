@@ -2,9 +2,10 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { descricaoDiff, registrarAuditoria, type AuditAction } from '@/lib/audit'
 import { withoutLegacyVirtualFields } from '@/lib/payload'
+import { deleteArquivo } from '@/lib/supabase-storage'
 
 export const SOLICITACAO_INVENTARIO_STATUS = ['pendente', 'aprovada', 'recusada'] as const
-export const SOLICITACAO_INVENTARIO_ACOES = ['CREATE', 'UPDATE', 'DELETE', 'ALLOCATE', 'DEALLOCATE', 'CORRECTION'] as const
+export const SOLICITACAO_INVENTARIO_ACOES = ['CREATE', 'UPDATE', 'DELETE', 'ALLOCATE', 'DEALLOCATE', 'CORRECTION', 'UPLOAD'] as const
 
 export type SolicitacaoInventarioAcao = typeof SOLICITACAO_INVENTARIO_ACOES[number]
 
@@ -30,6 +31,10 @@ type SolicitacaoInventarioAplicavel = {
   dados_propostos: Record<string, unknown> | null
 }
 
+type SolicitacaoInventarioResponse = SolicitacaoInventarioAplicavel & {
+  [key: string]: unknown
+}
+
 export const SOLICITACAO_INVENTARIO_RECURSOS: Record<string, ResourceConfig> = {
   maquinas: { delegate: 'maquinas', label: 'Máquinas' },
   notebooks: { delegate: 'notebooks', label: 'Notebooks' },
@@ -42,6 +47,7 @@ export const SOLICITACAO_INVENTARIO_RECURSOS: Record<string, ResourceConfig> = {
   alocacoes_notebooks: { delegate: 'alocacoes_notebooks', label: 'Alocações — Notebooks', alocacao: true },
   alocacoes_aparelhos: { delegate: 'alocacoes_aparelhos', label: 'Alocações — Aparelhos', alocacao: true },
   alocacoes_ramais: { delegate: 'alocacoes_ramais', label: 'Alocações — Ramais', alocacao: true },
+  forum_arquivos: { delegate: 'forum_arquivos', label: 'Documentos do Fórum' },
 }
 
 export function normalizarTipoRecurso(tipoRecurso: string) {
@@ -85,6 +91,8 @@ export function cleanInventarioPayload(payload: unknown) {
     'alocacao_ativa',
     'alocacoes_ativas',
     '_count',
+    'pasta_nome',
+    'enviado_por_nome',
   ]) {
     delete clean[key]
   }
@@ -154,6 +162,25 @@ export async function buscarSnapshotInventario(tipoRecurso: string, recursoId?: 
   return enriquecerPayloadInventario(tipoRecurso, snapshot)
 }
 
+export function sanitizeSolicitacaoInventarioResponse<T extends SolicitacaoInventarioResponse>(solicitacao: T): T {
+  if (solicitacao.tipo_recurso !== 'forum_arquivos') return solicitacao
+  const dadosPropostos = solicitacao.dados_propostos
+  if (typeof dadosPropostos?.url_publica !== 'string') return solicitacao
+  if (!dadosPropostos.url_publica.startsWith('data:')) return solicitacao
+
+  return {
+    ...solicitacao,
+    dados_propostos: {
+      ...dadosPropostos,
+      url_publica: '[arquivo anexado ao pedido]',
+    },
+  }
+}
+
+export function sanitizeSolicitacoesInventarioResponse<T extends SolicitacaoInventarioResponse>(solicitacoes: T[]) {
+  return solicitacoes.map(sanitizeSolicitacaoInventarioResponse)
+}
+
 export async function aplicarSolicitacaoInventario(
   solicitacao: SolicitacaoInventarioAplicavel,
   reviewer: { usuario_id: string | null; usuario_nome: string | null },
@@ -172,7 +199,10 @@ export async function aplicarSolicitacaoInventario(
   let resultado: Record<string, unknown> | null = null
   let auditAction: AuditAction = acao as AuditAction
 
-  if (acao === 'CREATE' || acao === 'ALLOCATE') {
+  if (tipoRecurso === 'forum_arquivos' && acao === 'UPLOAD') {
+    resultado = await delegate.create({ data: dadosPropostos })
+    auditAction = 'CREATE'
+  } else if (acao === 'CREATE' || acao === 'ALLOCATE') {
     resultado = await delegate.create({ data: dadosPropostos })
     auditAction = recurso.alocacao || acao === 'ALLOCATE' ? 'ALOCAR' : 'CREATE'
   } else if (acao === 'UPDATE' || acao === 'CORRECTION') {
@@ -198,8 +228,9 @@ export async function aplicarSolicitacaoInventario(
     tabela: tipoRecurso,
     registro_id: String(resultado?.id ?? recursoId ?? solicitacao.id),
     acao: auditAction,
-    descricao:
-      auditAction === 'UPDATE' || auditAction === 'EDITAR_ALOCACAO'
+    descricao: tipoRecurso === 'forum_arquivos' && acao === 'UPLOAD'
+      ? `Upload aprovado: ${String(dadosPropostos.nome_original ?? 'arquivo')}`
+      : auditAction === 'UPDATE' || auditAction === 'EDITAR_ALOCACAO'
         ? descricaoDiff((anterior ?? {}) as Record<string, unknown>, dadosPropostos)
         : `Solicitação de inventário aprovada: ${recurso.label}`,
     dados_anteriores: (anterior ?? solicitacao.dados_anteriores ?? null) as Prisma.JsonObject | null,
@@ -209,4 +240,19 @@ export async function aplicarSolicitacaoInventario(
   })
 
   return resultado
+}
+
+export async function descartarUploadPendenteSolicitacao(solicitacao: SolicitacaoInventarioAplicavel) {
+  if (solicitacao.tipo_recurso !== 'forum_arquivos' || solicitacao.acao !== 'UPLOAD') return
+
+  const storagePath = solicitacao.dados_propostos?.nome_armazenado
+  const publicUrl = solicitacao.dados_propostos?.url_publica
+  if (typeof storagePath !== 'string' || !storagePath.trim()) return
+  if (storagePath.startsWith('inline-upload/') || (typeof publicUrl === 'string' && publicUrl.startsWith('data:'))) return
+
+  try {
+    await deleteArquivo(storagePath)
+  } catch (error) {
+    console.error('[solicitacoes-inventario] erro ao remover upload pendente', error)
+  }
 }

@@ -56,6 +56,7 @@ export async function GET(request: Request) {
 
     const arquivosComAutoria = arquivos.map(arquivo => ({
       ...arquivo,
+      url_publica: arquivo.url_publica.startsWith('data:') ? '' : arquivo.url_publica,
       enviado_por_nome: arquivo.usuario?.nome?.trim() || 'Usuário removido',
     }))
 
