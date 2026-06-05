@@ -48,8 +48,17 @@ export async function GET(request: Request) {
       parentId ? prisma.forum_arquivos.findMany({
         where: { pasta_id: parentId },
         orderBy: { created_at: 'desc' },
+        include: {
+          usuario: { select: { nome: true } },
+        },
       }) : Promise.resolve([]),
     ])
+
+    const arquivosComAutoria = arquivos.map(arquivo => ({
+      ...arquivo,
+      url_publica: arquivo.url_publica.startsWith('data:') ? '' : arquivo.url_publica,
+      enviado_por_nome: arquivo.usuario?.nome?.trim() || 'Usuário removido',
+    }))
 
     // Breadcrumb — montar trilha até a raiz
     const breadcrumb: any[] = []
@@ -63,7 +72,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ pastas, arquivos, breadcrumb })
+    return NextResponse.json({ pastas, arquivos: arquivosComAutoria, breadcrumb })
   } catch (err) {
     console.error('[GET /api/forum/pastas]', err)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

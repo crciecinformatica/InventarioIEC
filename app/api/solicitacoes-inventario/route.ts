@@ -11,6 +11,8 @@ import {
   enriquecerPayloadInventario,
   normalizarTipoRecurso,
   SOLICITACAO_INVENTARIO_ACOES,
+  sanitizeSolicitacaoInventarioResponse,
+  sanitizeSolicitacoesInventarioResponse,
 } from '@/lib/solicitacoes-inventario'
 
 export const runtime = 'nodejs'
@@ -62,7 +64,7 @@ export async function GET(request: Request) {
       delegate.count({ where }),
     ])
 
-    return NextResponse.json({ data, total, page, totalPages: Math.ceil(total / limit) })
+    return NextResponse.json({ data: sanitizeSolicitacoesInventarioResponse(data), total, page, totalPages: Math.ceil(total / limit) })
   } catch (error) {
     console.error('[GET /api/solicitacoes-inventario]', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -83,7 +85,7 @@ export async function POST(request: Request) {
     if (!SOLICITACAO_INVENTARIO_ACOES.includes(acao as any)) {
       return NextResponse.json({ error: 'Ação inválida' }, { status: 400 })
     }
-    if (acao !== 'CREATE' && acao !== 'ALLOCATE' && !recursoId) {
+    if (acao !== 'CREATE' && acao !== 'ALLOCATE' && acao !== 'UPLOAD' && !recursoId) {
       return NextResponse.json({ error: 'recurso_id é obrigatório' }, { status: 400 })
     }
 
@@ -121,7 +123,7 @@ export async function POST(request: Request) {
       usuario_nome,
     })
 
-    return NextResponse.json(solicitacao, { status: 201 })
+    return NextResponse.json(sanitizeSolicitacaoInventarioResponse(solicitacao), { status: 201 })
   } catch (error) {
     console.error('[POST /api/solicitacoes-inventario]', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

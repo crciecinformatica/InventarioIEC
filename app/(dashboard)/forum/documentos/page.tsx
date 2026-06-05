@@ -11,6 +11,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
 import { pushInspectHistory } from '@/lib/navigation-context'
+import { useSolicitacaoInventarioConfirm } from '@/components/solicitacoes-inventario/solicitacao-confirm-provider'
 
 interface Pasta {
   id: string
@@ -29,6 +30,7 @@ interface Arquivo {
   tamanho_bytes: number
   url_publica: string
   usuario_id: string | null
+  enviado_por_nome: string
   created_at: string | null
 }
 
@@ -50,6 +52,14 @@ function getFileIcon(mime?: string | null) {
   return <File className="w-5 h-5 text-slate-400" />
 }
 
+function getDownloadHref(arq: Arquivo) {
+  return `/api/forum/arquivos/${arq.id}/download/${encodeURIComponent(arq.nome_original)}`
+}
+
+function getPreviewHref(arq: Arquivo) {
+  return `/api/forum/arquivos/${arq.id}/preview/${encodeURIComponent(arq.nome_original)}`
+}
+
 export default function DocumentosPage() {
   const { data: session } = useSession()
   const router = useRouter()
@@ -57,6 +67,7 @@ export default function DocumentosPage() {
   const pastaParam = searchParams.get('pasta')
   const perfil = (session?.user as any)?.perfil as string
   const isAdmin = perfil === 'admin'
+  const confirmSolicitacao = useSolicitacaoInventarioConfirm()
 
   const [pastas, setPastas]         = useState<Pasta[]>([])
   const [arquivos, setArquivos]     = useState<Arquivo[]>([])
@@ -164,12 +175,23 @@ export default function DocumentosPage() {
   // Upload
   async function handleUpload() {
     if (!uploadFile || !currentId) return
+    let comentario = uploadDesc
+    if (!isAdmin) {
+      const solicitacao = await confirmSolicitacao({
+        title: 'Solicitar aprovação de upload?',
+        description: 'O arquivo será enviado para revisão e só ficará disponível em Documentos após aprovação administrativa.',
+      })
+      if (!solicitacao.confirmed) return
+      comentario = solicitacao.comentario || uploadDesc
+    }
+
     setUploading(true)
     setUploadProgress(10)
     try {
       const formData = new FormData()
       formData.append('file', uploadFile)
       if (uploadDesc) formData.append('descricao', uploadDesc)
+      if (comentario) formData.append('comentario', comentario)
 
       setUploadProgress(40)
       const res = await fetch(`/api/forum/pastas/${currentId}/upload`, {
@@ -184,7 +206,8 @@ export default function DocumentosPage() {
       }
 
       setUploadProgress(100)
-      toast.success('Arquivo enviado!')
+      const json = await res.json().catch(() => ({}))
+      toast.success(json.pending_approval ? 'Pedido de upload enviado para aprovação.' : 'Arquivo enviado!')
       setShowUpload(false)
       setUploadFile(null)
       setUploadDesc('')
@@ -345,18 +368,18 @@ export default function DocumentosPage() {
                     <div className="flex min-w-0 items-center gap-2.5 md:col-span-6">
                       {getFileIcon(arq.tipo_arquivo)}
                       <div className="min-w-0">
-                        <a href={arq.url_publica} target="_blank" rel="noopener noreferrer"
+                        <a href={getPreviewHref(arq)} target="_blank" rel="noopener noreferrer"
                           className="block truncate text-sm font-medium text-slate-200 transition hover:text-blue-400">
                           {arq.nome_original}
                         </a>
                       </div>
                     </div>
-                    <span className="truncate text-xs text-slate-500 md:col-span-2">{arq.usuario_id}</span>
+                    <span className="truncate text-xs text-slate-500 md:col-span-2">{arq.enviado_por_nome}</span>
                     <span className="text-xs text-slate-400 md:col-span-2">{formatDate(arq.created_at)}</span>
                     <div className="flex items-center justify-between md:col-span-2">
                       <span className="text-xs text-slate-400">{formatSize(arq.tamanho_bytes)}</span>
                       <div className="flex gap-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
-                        <a href={arq.url_publica} download target="_blank" rel="noopener noreferrer"
+                        <a href={getDownloadHref(arq)} download={arq.nome_original}
                           className="p-1 rounded text-slate-400 hover:text-blue-500 transition">
                           <Download className="w-3.5 h-3.5" />
                         </a>

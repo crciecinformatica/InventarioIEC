@@ -5,7 +5,11 @@ import { randomUUID } from 'crypto'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getAuditSession, registrarAuditoria } from '@/lib/audit'
-import { aplicarSolicitacaoInventario } from '@/lib/solicitacoes-inventario'
+import {
+  aplicarSolicitacaoInventario,
+  descartarUploadPendenteSolicitacao,
+  sanitizeSolicitacaoInventarioResponse,
+} from '@/lib/solicitacoes-inventario'
 
 export const runtime = 'nodejs'
 type Props = { params: Promise<{ id: string }> }
@@ -61,7 +65,7 @@ export async function PATCH(request: Request, { params }: Props) {
           updated_at: new Date(),
         },
       })
-      return NextResponse.json(atualizada)
+      return NextResponse.json(sanitizeSolicitacaoInventarioResponse(atualizada))
     }
 
     if ((session.user as any)?.perfil !== 'admin') {
@@ -77,6 +81,8 @@ export async function PATCH(request: Request, { params }: Props) {
       : existingComentarios(solicitacao.comentarios)
 
     if (decisao === 'recusar' || decisao === 'recusada' || decisao === 'rejeitar') {
+      await descartarUploadPendenteSolicitacao(solicitacao)
+
       const recusada = await delegate.update({
         where: { id },
         data: {
@@ -102,7 +108,7 @@ export async function PATCH(request: Request, { params }: Props) {
         usuario_nome: reviewer.usuario_nome,
       })
 
-      return NextResponse.json(recusada)
+      return NextResponse.json(sanitizeSolicitacaoInventarioResponse(recusada))
     }
 
     if (decisao !== 'aprovar' && decisao !== 'aprovada') {
@@ -136,7 +142,7 @@ export async function PATCH(request: Request, { params }: Props) {
         usuario_nome: reviewer.usuario_nome,
       })
 
-      return NextResponse.json(aprovada)
+      return NextResponse.json(sanitizeSolicitacaoInventarioResponse(aprovada))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao aplicar solicitação'
       const atualizada = await delegate.update({
@@ -146,7 +152,7 @@ export async function PATCH(request: Request, { params }: Props) {
           updated_at: new Date(),
         },
       })
-      return NextResponse.json({ error: message, solicitacao: atualizada }, { status: 409 })
+      return NextResponse.json({ error: message, solicitacao: sanitizeSolicitacaoInventarioResponse(atualizada) }, { status: 409 })
     }
   } catch (error) {
     console.error('[PATCH /api/solicitacoes-inventario/[id]]', error)
