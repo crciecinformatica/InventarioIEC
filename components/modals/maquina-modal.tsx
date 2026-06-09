@@ -3,7 +3,7 @@ import { usePermission } from '@/hooks/use-permission'
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Pencil, Trash2, Loader2, UserPlus, ExternalLink, ShieldAlert, CheckCircle2, Clock3 } from "lucide-react";
+import { X, Pencil, Trash2, Loader2, UserPlus, ExternalLink, ShieldAlert, CheckCircle2, Clock3, AlertTriangle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -127,6 +127,17 @@ export function MaquinaModal({ maquina, onClose, onRefresh }: Props) {
  }
 
  function snowAlertView(alert: SnowMachineAlert) {
+  if (alert.status === 'Inconsistente' || alert.status === 'inconsistente') {
+   return {
+    label: 'Solicitação com inconsistência',
+    icon: AlertTriangle,
+    frame: 'border-rose-300/60 bg-rose-50 text-rose-950 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100',
+    iconBox: 'bg-rose-600 text-white dark:bg-rose-500/20 dark:text-rose-100',
+    badge: 'bg-rose-100 text-rose-800 dark:bg-rose-400/10 dark:text-rose-100',
+    text: 'text-rose-700 dark:text-rose-200',
+    button: 'bg-rose-600 hover:bg-rose-700 text-white',
+   }
+  }
   if (alert.status === 'Quarentena') {
    return {
     label: 'Quarentena',
@@ -295,10 +306,16 @@ export function MaquinaModal({ maquina, onClose, onRefresh }: Props) {
           </span>
           <div className="min-w-0 flex-1">
            <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold">Máquina apontada pelo SNOW</p>
-            <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${snowAlertView(snowAlert).badge}`}>
-             {snowAlertView(snowAlert).label}
-            </span>
+            {snowAlertView(snowAlert).label === 'Solicitação com inconsistência' ? (
+             <p className={`text-sm font-semibold ${snowAlertView(snowAlert).text}`}>Solicitação com inconsistência</p>
+            ) : (
+             <>
+              <p className="text-sm font-semibold">Máquina apontada pelo SNOW</p>
+              <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${snowAlertView(snowAlert).badge}`}>
+               {snowAlertView(snowAlert).label}
+              </span>
+             </>
+            )}
            </div>
            <p className={`mt-1 truncate text-xs ${snowAlertView(snowAlert).text}`}>
             {snowAlert.arquivo || 'Solicitação operacional SNOW'}

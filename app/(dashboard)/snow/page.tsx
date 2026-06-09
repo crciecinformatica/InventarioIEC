@@ -1199,7 +1199,7 @@ export default function SnowPage() {
                       setInconsistentInspect(null)
                       openMachineInspect(inconsistentInspect)
                     }}
-                    className="flex-1 rounded-lg border border-rose-500/40 bg-slate-950 px-3 py-2 text-left text-rose-100 transition hover:border-rose-300 hover:bg-rose-950/40 dark:border-rose-500/40 dark:bg-slate-950 dark:text-rose-100 dark:hover:border-rose-300"
+                    className="flex-1 rounded-lg border border-rose-500/40 bg-slate-950 px-3 py-2 text-left text-rose-100 shadow-sm shadow-rose-950/20 transition hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-950/40 hover:text-white focus:outline-none focus:ring-2 focus:ring-rose-400/60 dark:border-rose-500/40 dark:bg-slate-950 dark:text-rose-100 dark:hover:border-rose-300"
                   >
                     <span className="text-xs font-semibold uppercase tracking-wide">Inspecionar máquina</span>
                     <span className="mt-0.5 block text-sm">Abrir o cadastro relacionado no inventário.</span>
@@ -1209,7 +1209,7 @@ export default function SnowPage() {
                   <button
                     type="button"
                     onClick={() => openSnowSolicitationFromInspect(inconsistentInspect.solicitacao_snow?.id ?? selected!.id, inconsistentInspect.id)}
-                    className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-slate-700 transition hover:border-rose-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-rose-500/60"
+                    className="flex-1 rounded-lg border border-rose-500/40 bg-slate-950 px-3 py-2 text-left text-rose-100 shadow-sm shadow-rose-950/20 transition hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-950/40 hover:text-white focus:outline-none focus:ring-2 focus:ring-rose-400/60 dark:border-rose-500/40 dark:bg-slate-950 dark:text-rose-100 dark:hover:border-rose-300"
                   >
                     <span className="text-xs font-semibold uppercase tracking-wide">Abrir solicitação</span>
                     <span className="mt-0.5 block text-sm">Ver este item dentro da solicitação SNOW.</span>
