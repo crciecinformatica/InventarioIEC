@@ -31,6 +31,34 @@ describe('lib/snow/matching', () => {
     expect(result.maquina_id).toBeNull()
   })
 
+  it('marca inconsistente quando IP encontrado diverge do hostname enviado pelo SNOW', () => {
+    const result = resolveMachineMatch({
+      ip: '10.0.0.1',
+      hostname: 'HOST-DIVERGENTE',
+      machineByIp: machineA,
+      machineByHostname: null,
+      tipoRelatorio: 'ativos_nao_inventariados',
+    })
+
+    expect(result.status).toBe('inconsistente')
+    expect(result.maquina_id).toBe('maquina-a')
+    expect(result.motivo).toContain('hostname SNOW')
+  })
+
+  it('marca inconsistente quando hostname encontrado diverge do IP enviado pelo SNOW', () => {
+    const result = resolveMachineMatch({
+      ip: '10.0.0.99',
+      hostname: 'HOST-A',
+      machineByIp: null,
+      machineByHostname: machineA,
+      tipoRelatorio: 'ativos_nao_inventariados',
+    })
+
+    expect(result.status).toBe('inconsistente')
+    expect(result.maquina_id).toBe('maquina-a')
+    expect(result.motivo).toContain('IP SNOW')
+  })
+
   it('marca não atendida quando não encontra máquina', () => {
     const result = resolveMachineMatch({
       ip: '10.0.0.2',

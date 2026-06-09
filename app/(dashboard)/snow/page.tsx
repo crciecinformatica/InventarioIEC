@@ -112,7 +112,7 @@ type Overview = {
 
 type DateScope = 'hoje' | '7d' | '30d' | 'tudo'
 type ViewMode = 'solicitacoes' | 'maquinas'
-type MachineFilter = 'pendentes' | 'em_atendimento' | 'resolvidas' | 'quarentena'
+type MachineFilter = 'pendentes' | 'em_atendimento' | 'resolvidas' | 'quarentena' | 'inconsistentes'
 
 const TIPO_LABELS: Record<string, string> = {
   ativos_nao_inventariados: 'Ativos não inventariados',
@@ -285,6 +285,7 @@ function machineFilterLabel(filter: MachineFilter) {
   if (filter === 'em_atendimento') return 'em atendimento'
   if (filter === 'resolvidas') return 'resolvidas'
   if (filter === 'quarentena') return 'em quarentena'
+  if (filter === 'inconsistentes') return 'inconsistentes'
   return 'pendentes'
 }
 
@@ -298,7 +299,7 @@ export default function SnowPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(() => searchParams.get('view') === 'maquinas' ? 'maquinas' : 'solicitacoes')
   const [machineFilter, setMachineFilter] = useState<MachineFilter>(() => {
     const filter = searchParams.get('filter')
-    return filter === 'pendentes' || filter === 'em_atendimento' || filter === 'resolvidas' || filter === 'quarentena' ? filter : 'pendentes'
+    return filter === 'pendentes' || filter === 'em_atendimento' || filter === 'resolvidas' || filter === 'quarentena' || filter === 'inconsistentes' ? filter : 'pendentes'
   })
   const [navigatingItemId, setNavigatingItemId] = useState<string | null>(null)
   const [dateScope, setDateScope] = useState<DateScope>(() => {
@@ -326,6 +327,7 @@ export default function SnowPage() {
   })
   const [selected, setSelected] = useState<SnowDetalhe | null>(null)
   const [quarantineInspect, setQuarantineInspect] = useState<SnowItem | null>(null)
+  const [inconsistentInspect, setInconsistentInspect] = useState<SnowItem | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const closingInspectRef = useRef(false)
 
@@ -335,6 +337,7 @@ export default function SnowPage() {
     if (machineFilter === 'em_atendimento') return { status: 'atendida', planner_status: 'assumido' }
     if (machineFilter === 'resolvidas') return { status: 'atendida', planner_status: 'concluido' }
     if (machineFilter === 'quarentena') return { status: 'em_quarentena' }
+    if (machineFilter === 'inconsistentes') return { status: 'inconsistente' }
     return { status: 'atendida', planner_status: 'pendente' }
   }, [machineFilter])
 
@@ -354,7 +357,7 @@ export default function SnowPage() {
     const pageParam = Math.max(1, Number(searchParams.get('page') || 1))
 
     if (view === 'maquinas' || view === 'solicitacoes') setViewMode(view)
-    if (filter === 'pendentes' || filter === 'em_atendimento' || filter === 'resolvidas' || filter === 'quarentena') setMachineFilter(filter)
+    if (filter === 'pendentes' || filter === 'em_atendimento' || filter === 'resolvidas' || filter === 'quarentena' || filter === 'inconsistentes') setMachineFilter(filter)
     if (scope === 'hoje' || scope === '7d' || scope === '30d' || scope === 'tudo') setDateScope(scope)
     if (view === 'maquinas') setMachinePage(pageParam)
     if (view === 'solicitacoes') setPage(pageParam)
@@ -502,9 +505,10 @@ export default function SnowPage() {
     window.setTimeout(() => { closingInspectRef.current = false }, 350)
   }
 
-  function openSnowSolicitationFromQuarantine(solicitacaoId: string, itemId?: string | null) {
+  function openSnowSolicitationFromInspect(solicitacaoId: string, itemId?: string | null) {
     closingInspectRef.current = false
     setQuarantineInspect(null)
+    setInconsistentInspect(null)
     setSelected(null)
     const params = new URLSearchParams()
     params.set('view', 'solicitacoes')
@@ -520,6 +524,11 @@ export default function SnowPage() {
     setMachineFilter(filter)
     setMachinePage(1)
     setViewMode('maquinas')
+  }
+
+  function openInconsistentInspect(item: SnowItem) {
+    if (item.status !== 'inconsistente') return
+    setInconsistentInspect(item)
   }
 
   async function openQuarantineInspect(item: SnowItem) {
@@ -544,9 +553,13 @@ export default function SnowPage() {
   }
 
   function openMachineInspect(item: SnowItem) {
-    if (!item.maquina_id || !['atendida', 'em_quarentena'].includes(item.status)) return
+    if (!item.maquina_id || !['atendida', 'em_quarentena', 'inconsistente'].includes(item.status)) return
     const title = machineTitle(item)
-    const subtitle = item.status === 'em_quarentena' ? 'Recorrência SNOW em menos de 15 dias' : 'Encontrada pelo fluxo SNOW'
+    const subtitle = item.status === 'em_quarentena'
+      ? 'Recorrência SNOW em menos de 15 dias'
+      : item.status === 'inconsistente'
+        ? 'Inconsistência de IP/hostname no SNOW'
+        : 'Encontrada pelo fluxo SNOW'
     const href = `/maquinas?inspect=${item.maquina_id}`
     setNavigatingItemId(item.id)
     if (typeof window !== 'undefined') {
@@ -621,6 +634,17 @@ export default function SnowPage() {
       accessorKey: 'total_quarentena',
       header: 'Quarentena',
       cell: ({ row }) => row.original.total_quarentena.toLocaleString('pt-BR'),
+    },
+    {
+      accessorKey: 'total_inconsistentes',
+      header: 'Inconsistências',
+      cell: ({ row }) => row.original.total_inconsistentes > 0
+        ? (
+          <span className="inline-flex rounded-md bg-rose-500/10 px-2 py-0.5 text-xs font-semibold text-rose-300">
+            {row.original.total_inconsistentes.toLocaleString('pt-BR')}
+          </span>
+        )
+        : <span className="text-slate-500">Sem inconsistência</span>,
     },
     {
       accessorKey: 'status_processamento',
@@ -701,7 +725,7 @@ export default function SnowPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
             <MetricCard
               label="Solicitações"
               value={overview.total_solicitacoes}
@@ -746,6 +770,15 @@ export default function SnowPage() {
               description="Recorrência antes de 15 dias"
               active={viewMode === 'maquinas' && machineFilter === 'quarentena'}
               onClick={() => selectMachineFilter('quarentena')}
+            />
+            <MetricCard
+              label="Inconsistentes"
+              value={overview.inconsistentes}
+              icon={AlertTriangle}
+              tone="bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200"
+              description="IP ou hostname divergente"
+              active={viewMode === 'maquinas' && machineFilter === 'inconsistentes'}
+              onClick={() => selectMachineFilter('inconsistentes')}
             />
           </div>
         </section>
@@ -809,10 +842,11 @@ export default function SnowPage() {
               <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                 {machineItems.map(item => {
                   const isQuarantine = item.status === 'em_quarentena'
+                  const isInconsistent = item.status === 'inconsistente'
                   return (
                   <motion.button
                     key={item.id}
-                    onClick={() => isQuarantine ? openQuarantineInspect(item) : openMachineInspect(item)}
+                    onClick={() => isQuarantine ? openQuarantineInspect(item) : isInconsistent ? openInconsistentInspect(item) : openMachineInspect(item)}
                     disabled={item.status === 'nao_atendida'}
                     layout
                     whileHover={reduceMotion ? undefined : { y: -2 }}
@@ -820,6 +854,7 @@ export default function SnowPage() {
                     className={cn(
                       'group flex min-w-0 flex-col rounded-lg border border-slate-100 bg-slate-50 p-4 text-left transition hover:border-blue-300 hover:bg-white dark:border-slate-800 dark:bg-slate-950/60 dark:hover:border-blue-500/60 dark:hover:bg-slate-950',
                       isQuarantine && 'border-amber-300/70 bg-amber-50/70 hover:border-amber-400 dark:border-amber-500/30 dark:bg-amber-500/10 dark:hover:border-amber-400/70',
+                      isInconsistent && 'border-rose-300/70 bg-rose-50/70 hover:border-rose-400 dark:border-rose-500/30 dark:bg-rose-500/10 dark:hover:border-rose-400/70',
                       item.status === 'nao_atendida' && 'cursor-default hover:translate-y-0 hover:border-slate-100 hover:bg-slate-50 dark:hover:border-slate-800 dark:hover:bg-slate-950/60',
                       navigatingItemId === item.id && 'border-blue-400 bg-blue-50 ring-2 ring-blue-500/40 dark:border-blue-500 dark:bg-blue-500/10'
                     )}
@@ -836,6 +871,8 @@ export default function SnowPage() {
                         <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-400" />
                       ) : isQuarantine ? (
                         <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400 transition group-hover:scale-110" />
+                      ) : isInconsistent ? (
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400 transition group-hover:scale-110" />
                       ) : (
                         <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-blue-400" />
                       )}
@@ -886,6 +923,12 @@ export default function SnowPage() {
                           </p>
                         </div>
                       )}
+                      {isInconsistent && (
+                        <div className="col-span-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide">Inconsistência SNOW</p>
+                          <p className="mt-0.5 line-clamp-2">{item.motivo || 'IP ou hostname diverge do cadastro oficial.'}</p>
+                        </div>
+                      )}
                     </div>
                   </motion.button>
                   )
@@ -933,7 +976,7 @@ export default function SnowPage() {
               <div>
                 <p className="text-xs text-slate-500">Totais</p>
                 <p className="font-medium text-slate-800 dark:text-slate-100">
-                  {selected.total_atendidas} encontradas · {selected.total_quarentena} quarentena · {selected.total_nao_atendidas} fora
+                  {selected.total_atendidas} encontradas · {selected.total_quarentena} quarentena · {selected.total_inconsistentes} inconsistentes · {selected.total_nao_atendidas} fora
                 </p>
               </div>
             </div>
@@ -947,16 +990,17 @@ export default function SnowPage() {
               ) : (
                 <div className="grid gap-2">
                   {selected.itens.map(item => {
-                    const canOpen = Boolean(item.maquina_id && ['atendida', 'em_quarentena'].includes(item.status))
+                    const canOpen = Boolean(item.maquina_id && ['atendida', 'em_quarentena', 'inconsistente'].includes(item.status))
                     return (
                       <button
                         key={item.id}
-                        onClick={() => item.status === 'em_quarentena' ? openQuarantineInspect(item) : openMachineInspect(item)}
+                        onClick={() => item.status === 'em_quarentena' ? openQuarantineInspect(item) : item.status === 'inconsistente' ? openInconsistentInspect(item) : openMachineInspect(item)}
                         disabled={!canOpen}
                         className={cn(
                           'grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-3 text-left transition dark:border-slate-800 dark:bg-slate-900/70 lg:grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]',
                           canOpen && 'hover:border-blue-300 hover:bg-white dark:hover:border-blue-500/60 dark:hover:bg-slate-900',
                           item.status === 'em_quarentena' && 'border-amber-300/70 bg-amber-50/70 dark:border-amber-500/30 dark:bg-amber-500/10',
+                          item.status === 'inconsistente' && 'border-rose-300/70 bg-rose-50/70 dark:border-rose-500/30 dark:bg-rose-500/10',
                           !canOpen && 'cursor-default opacity-80'
                         )}
                       >
@@ -974,6 +1018,11 @@ export default function SnowPage() {
                           <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{item.setor_alocado || '-'} · {item.localidade_alocada || '-'}</p>
                         </div>
                         <div className="flex items-center gap-3">
+                          {item.status === 'inconsistente' && (
+                            <span className="hidden max-w-[260px] truncate rounded-md bg-rose-500/10 px-2 py-1 text-xs text-rose-200 sm:inline-block">
+                              {item.motivo || 'IP ou hostname divergente'}
+                            </span>
+                          )}
                           {item.status === 'em_quarentena' && (
                             <span className="hidden items-center gap-1 rounded-md bg-amber-500/10 px-2 py-1 text-xs text-amber-200 sm:inline-flex">
                               <Clock3 className="h-3 w-3" />
@@ -1058,7 +1107,7 @@ export default function SnowPage() {
                       type="button"
                       onClick={() => {
                         if (repeticao.solicitacao_snow) {
-                          openSnowSolicitationFromQuarantine(repeticao.solicitacao_snow.id, repeticao.id)
+                          openSnowSolicitationFromInspect(repeticao.solicitacao_snow.id, repeticao.id)
                         }
                       }}
                       className="w-full rounded-lg border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-amber-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900/70 dark:hover:border-amber-500/50 dark:hover:bg-slate-900"
@@ -1074,6 +1123,99 @@ export default function SnowPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {inconsistentInspect && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-3" role="dialog" aria-modal="true">
+          <motion.div
+            className="flex w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-rose-300/40 bg-white shadow-2xl dark:border-rose-500/30 dark:bg-slate-950"
+            initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.98 }}
+            animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-rose-200/70 bg-rose-50 p-5 dark:border-rose-500/20 dark:bg-rose-500/10">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-rose-500" />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-200">Inconsistência SNOW</p>
+                </div>
+                <h2 className="mt-1 truncate text-xl font-bold text-slate-900 dark:text-white">{machineTitle(inconsistentInspect)}</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{inconsistentInspect.motivo || 'IP ou hostname diverge do cadastro oficial do inventário.'}</p>
+              </div>
+              <button onClick={() => setInconsistentInspect(null)} className="rounded-lg p-2 text-slate-500 hover:bg-white/70 dark:hover:bg-slate-900" aria-label="Fechar inconsistência">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-3 border-b border-slate-100 p-4 text-sm dark:border-slate-800 md:grid-cols-2">
+              <div className="rounded-lg border border-rose-100 bg-rose-50/70 p-3 dark:border-rose-500/20 dark:bg-rose-500/10">
+                <p className="text-xs font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-200">Dados enviados pelo SNOW</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-slate-500">Hostname SNOW</p>
+                    <p className="truncate font-medium text-slate-800 dark:text-slate-100">{inconsistentInspect.hostname || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">IP SNOW</p>
+                    <p className="font-medium text-slate-800 dark:text-slate-100">{inconsistentInspect.ip || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cadastro no inventário</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-slate-500">Hostname cadastrado</p>
+                    <p className="truncate font-medium text-slate-800 dark:text-slate-100">{inconsistentInspect.maquina?.nome_host || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">IP cadastrado</p>
+                    <p className="font-medium text-slate-800 dark:text-slate-100">{inconsistentInspect.maquina?.endereco_ip || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs text-slate-500">Tipo de solicitação</p>
+                <p className="mt-0.5 font-medium text-slate-800 dark:text-slate-100">
+                  {TIPO_LABELS[inconsistentInspect.solicitacao_snow?.tipo_arquivo ?? inconsistentInspect.tipo_arquivo] ?? inconsistentInspect.tipo_arquivo}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs text-slate-500">Recebido em</p>
+                <p className="mt-0.5 font-medium text-slate-800 dark:text-slate-100">{formatDateTime(inconsistentInspect.solicitacao_snow?.recebido_em ?? inconsistentInspect.criado_em)}</p>
+              </div>
+
+              <div className="flex flex-col gap-2 md:col-span-2 sm:flex-row">
+                {inconsistentInspect.maquina_id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInconsistentInspect(null)
+                      openMachineInspect(inconsistentInspect)
+                    }}
+                    className="flex-1 rounded-lg border border-rose-500/40 bg-slate-950 px-3 py-2 text-left text-rose-100 transition hover:border-rose-300 hover:bg-rose-950/40 dark:border-rose-500/40 dark:bg-slate-950 dark:text-rose-100 dark:hover:border-rose-300"
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wide">Inspecionar máquina</span>
+                    <span className="mt-0.5 block text-sm">Abrir o cadastro relacionado no inventário.</span>
+                  </button>
+                )}
+                {(inconsistentInspect.solicitacao_snow?.id ?? selected?.id) && (
+                  <button
+                    type="button"
+                    onClick={() => openSnowSolicitationFromInspect(inconsistentInspect.solicitacao_snow?.id ?? selected!.id, inconsistentInspect.id)}
+                    className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-slate-700 transition hover:border-rose-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-rose-500/60"
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wide">Abrir solicitação</span>
+                    <span className="mt-0.5 block text-sm">Ver este item dentro da solicitação SNOW.</span>
+                  </button>
+                )}
+              </div>
             </div>
           </motion.div>
         </div>

@@ -15,10 +15,14 @@ export function buildSnowProcessResult(arquivo: string, tipoRelatorio: SnowProce
   const naoAtendidas = itens.filter(item => item.status === 'nao_atendida')
   const emQuarentena = itens.filter(item => item.status === 'em_quarentena')
   const inconsistentes = itens.filter(item => item.status === 'inconsistente')
+  const descricao = inconsistentes.length > 0
+    ? `Relatório processado com ${inconsistentes.length} inconsistência(s) de IP/hostname. Tratar divergências internamente no inventário antes de nova ação operacional.`
+    : 'Relatório processado sem inconsistências de IP/hostname.'
 
   return {
     arquivo,
     tipo_relatorio: tipoRelatorio,
+    descricao,
     resumo: {
       total_recebido: itens.length,
       atendidas: atendidas.length,
@@ -37,7 +41,9 @@ export function buildSnowProcessResult(arquivo: string, tipoRelatorio: SnowProce
       {
         key: 'inconsistentes',
         titulo: 'Máquinas inconsistentes',
-        descricao: 'Máquinas em que IP e hostname apontam divergência. Devem ser tratadas internamente no inventário.',
+        descricao: inconsistentes.length > 0
+          ? 'Máquinas em que o IP e/ou hostname do SNOW divergem do cadastro oficial do inventário.'
+          : 'Nenhuma inconsistência de IP/hostname identificada neste relatório.',
         total: inconsistentes.length,
         itens: inconsistentes,
       },

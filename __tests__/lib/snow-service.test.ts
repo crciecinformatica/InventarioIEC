@@ -35,9 +35,19 @@ describe('lib/snow/service', () => {
       inconsistentes: 1,
     })
     expect(result.sections.map(section => section.key)).toEqual(['atendidas', 'inconsistentes'])
+    expect(result.descricao).toContain('1 inconsistência')
     expect(result.sections.flatMap(section => section.itens).map(sectionItem => sectionItem.status)).toEqual([
       'atendida',
       'inconsistente',
     ])
+  })
+
+  it('descreve quando relatório não possui inconsistências', () => {
+    const result = buildSnowProcessResult('snow.xlsx', 'computadores_a_serem_arquivados', [
+      item('atendida'),
+    ])
+
+    expect(result.descricao).toBe('Relatório processado sem inconsistências de IP/hostname.')
+    expect(result.sections.find(section => section.key === 'inconsistentes')?.descricao).toContain('Nenhuma inconsistência')
   })
 })

@@ -72,6 +72,7 @@ export type SnowProcessedItem = {
 export type SnowProcessResult = {
   arquivo: string
   tipo_relatorio: TipoRelatorioSnow
+  descricao: string
   resumo: {
     total_recebido: number
     atendidas: number

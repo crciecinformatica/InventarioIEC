@@ -713,6 +713,7 @@ export const snowOpenApiSpec = {
         required: [
           'arquivo',
           'tipo_relatorio',
+          'descricao',
           'resumo',
           'sections',
         ],
@@ -723,6 +724,10 @@ export const snowOpenApiSpec = {
               '2026-06-02 - [PSG] Computadores à serem arquivados.xlsx',
           },
           tipo_relatorio: { $ref: '#/components/schemas/TipoRelatorioSnow' },
+          descricao: {
+            type: 'string',
+            example: 'Relatório processado sem inconsistências de IP/hostname.',
+          },
           resumo: {
             type: 'object',
             required: [

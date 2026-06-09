@@ -1,4 +1,5 @@
 import type { SnowMachineMatch, SnowProcessedItem, TipoRelatorioSnow } from './types'
+import { normalizeHostname, normalizeIp } from './normalizers'
 
 export function buildMachineOperationalData(machine: SnowMachineMatch | null) {
   const activeAllocation = machine?.alocacoes?.[0] ?? null
@@ -20,6 +21,8 @@ export function resolveMachineMatch(params: {
   tipoRelatorio: TipoRelatorioSnow
 }): Omit<SnowProcessedItem, 'data_ultima_solicitacao' | 'bloqueado_ate'> {
   const { ip, hostname, machineByIp, machineByHostname, tipoRelatorio } = params
+  const normalizedHostname = normalizeHostname(hostname)
+  const normalizedIp = normalizeIp(ip)
 
   if (machineByIp && machineByHostname && machineByIp.id !== machineByHostname.id) {
     return {
@@ -27,9 +30,33 @@ export function resolveMachineMatch(params: {
       hostname,
       tipo_arquivo: tipoRelatorio,
       status: 'inconsistente',
-      motivo: 'IP e hostname apontam para máquinas diferentes no inventário',
+      motivo: `IP ${ip ?? '-'} aponta para ${machineByIp.nome_host ?? machineByIp.id}, mas hostname ${hostname ?? '-'} aponta para ${machineByHostname.nome_host ?? machineByHostname.id}`,
       maquina_id: null,
       ...buildMachineOperationalData(null),
+    }
+  }
+
+  if (machineByIp && normalizedHostname && normalizeHostname(machineByIp.nome_host) !== normalizedHostname) {
+    return {
+      ip,
+      hostname,
+      tipo_arquivo: tipoRelatorio,
+      status: 'inconsistente',
+      motivo: `IP encontrado no inventário, mas hostname SNOW (${hostname}) diverge do hostname cadastrado (${machineByIp.nome_host ?? '-'})`,
+      maquina_id: machineByIp.id,
+      ...buildMachineOperationalData(machineByIp),
+    }
+  }
+
+  if (machineByHostname && normalizedIp && normalizeIp(machineByHostname.endereco_ip) !== normalizedIp) {
+    return {
+      ip,
+      hostname,
+      tipo_arquivo: tipoRelatorio,
+      status: 'inconsistente',
+      motivo: `Hostname encontrado no inventário, mas IP SNOW (${ip}) diverge do IP cadastrado (${machineByHostname.endereco_ip ?? '-'})`,
+      maquina_id: machineByHostname.id,
+      ...buildMachineOperationalData(machineByHostname),
     }
   }
 
