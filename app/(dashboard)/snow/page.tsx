@@ -332,7 +332,7 @@ export default function SnowPage() {
   const closingInspectRef = useRef(false)
 
   const dateRange = useMemo(() => dateRangeForScope(dateScope), [dateScope])
-  const machineFilterQuery = useMemo(() => {
+  const machineFilterQuery = useMemo<{ status: string; planner_status?: string }>(() => {
     if (machineFilter === 'pendentes') return { status: 'atendida', planner_status: 'pendente' }
     if (machineFilter === 'em_atendimento') return { status: 'atendida', planner_status: 'assumido' }
     if (machineFilter === 'resolvidas') return { status: 'atendida', planner_status: 'concluido' }
@@ -443,7 +443,7 @@ export default function SnowPage() {
       setMachineLoading(true)
       try {
         const params = new URLSearchParams({ page: String(machinePage), limit: '18', status: machineFilterQuery.status })
-        if ('planner_status' in machineFilterQuery) params.set('planner_status', machineFilterQuery.planner_status)
+        if (machineFilterQuery.planner_status) params.set('planner_status', machineFilterQuery.planner_status)
         if (dateRange.inicio) params.set('inicio', dateRange.inicio)
         if (dateRange.fim) params.set('fim', dateRange.fim)
 
