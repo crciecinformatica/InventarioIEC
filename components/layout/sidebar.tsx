@@ -11,7 +11,8 @@ import {
   ChevronDown,
   MessageSquare,
   FolderOpen,
-  GitPullRequest
+  GitPullRequest,
+  FileSpreadsheet
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -72,6 +73,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/movimentacoes', label: 'Auditoria', icon: ScrollText },
       { href: '/pedidos', label: 'Pedidos', icon: GitPullRequest },
+      { href: '/snow', label: 'Snow', icon: FileSpreadsheet },
     ],
   },
 ]
@@ -93,6 +95,7 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [pendingHref, setPendingHref] = useState<string | null>(null)
   const [pendingPedidosCount, setPendingPedidosCount] = useState(0)
+  const [pendingSnowCount, setPendingSnowCount] = useState(0)
   const previousPathnameRef = useRef(pathname)
   const [openGroup, setOpenGroup] = useState<string | null>(() => {
     return navGroups.find(group => group.items.some(item => isNavItemActive(pathname, item.href)))?.label ?? 'Alocações'
@@ -114,17 +117,29 @@ export function Sidebar() {
   useEffect(() => {
     if (!session?.user) return
     let cancelled = false
-    async function loadPedidosCount() {
+    async function loadCounts() {
       try {
-        const res = await fetch('/api/solicitacoes-inventario/count')
-        const json = await res.json().catch(() => ({}))
-        if (!cancelled) setPendingPedidosCount(Number(json.count ?? 0))
+        const [pedidosRes, snowRes] = await Promise.all([
+          fetch('/api/solicitacoes-inventario/count'),
+          fetch('/api/snow/count'),
+        ])
+        const [pedidosJson, snowJson] = await Promise.all([
+          pedidosRes.json().catch(() => ({})),
+          snowRes.json().catch(() => ({})),
+        ])
+        if (!cancelled) {
+          setPendingPedidosCount(Number(pedidosJson.count ?? 0))
+          setPendingSnowCount(Number(snowJson.count ?? 0))
+        }
       } catch {
-        if (!cancelled) setPendingPedidosCount(0)
+        if (!cancelled) {
+          setPendingPedidosCount(0)
+          setPendingSnowCount(0)
+        }
       }
     }
-    loadPedidosCount()
-    const interval = window.setInterval(loadPedidosCount, 30000)
+    loadCounts()
+    const interval = window.setInterval(loadCounts, 30000)
     return () => {
       cancelled = true
       window.clearInterval(interval)
@@ -229,6 +244,11 @@ export function Sidebar() {
             {pendingPedidosCount > 99 ? '99+' : pendingPedidosCount}
           </span>
         )}
+        {!isCollapsed && href === '/snow' && pendingSnowCount > 0 && (
+          <span className="ml-auto min-w-5 rounded-full bg-cyan-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white">
+            {pendingSnowCount > 99 ? '99+' : pendingSnowCount}
+          </span>
+        )}
         {pending && !isCollapsed && (
           <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/80 animate-pulse" />
         )}
@@ -254,6 +274,7 @@ export function Sidebar() {
             const groupPending = group.items.some(item => pendingHref === item.href)
             const expanded = openGroup === group.label
             const groupPedidosCount = group.label === 'Serviços' ? pendingPedidosCount : 0
+            const groupSnowCount = group.label === 'Serviços' ? pendingSnowCount : 0
 
             return (
               <>
@@ -277,9 +298,18 @@ export function Sidebar() {
                   {!isCollapsed && (
                     <>
                       <span className="truncate">{group.label}</span>
-                      {groupPedidosCount > 0 && (
-                        <span className="ml-auto min-w-5 rounded-full bg-blue-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white">
-                          {groupPedidosCount > 99 ? '99+' : groupPedidosCount}
+                      {(groupPedidosCount > 0 || groupSnowCount > 0) && (
+                        <span className="ml-auto flex items-center gap-1">
+                          {groupPedidosCount > 0 && (
+                            <span className="min-w-5 rounded-full bg-blue-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white">
+                              {groupPedidosCount > 99 ? '99+' : groupPedidosCount}
+                            </span>
+                          )}
+                          {groupSnowCount > 0 && (
+                            <span className="min-w-5 rounded-full bg-cyan-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white">
+                              {groupSnowCount > 99 ? '99+' : groupSnowCount}
+                            </span>
+                          )}
                         </span>
                       )}
                       <ChevronDown
@@ -293,9 +323,18 @@ export function Sidebar() {
                   {groupActive && isCollapsed && (
                     <span className="absolute -left-2 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-blue-500" />
                   )}
-                  {isCollapsed && groupPedidosCount > 0 && (
-                    <span className="absolute right-1 top-1 h-4 min-w-4 rounded-full bg-blue-500 px-1 text-center text-[9px] font-bold leading-4 text-white">
-                      {groupPedidosCount > 9 ? '9+' : groupPedidosCount}
+                  {isCollapsed && (groupPedidosCount > 0 || groupSnowCount > 0) && (
+                    <span
+                      className={cn(
+                        'absolute right-1 top-1 h-4 min-w-4 rounded-full px-1 text-center text-[9px] font-bold leading-4 text-white',
+                        groupPedidosCount > 0 && groupSnowCount > 0
+                          ? 'bg-[linear-gradient(90deg,#3b82f6_0_50%,#06b6d4_50%_100%)]'
+                          : groupPedidosCount > 0
+                            ? 'bg-blue-500'
+                            : 'bg-cyan-500'
+                      )}
+                    >
+                      {groupPedidosCount + groupSnowCount > 9 ? '9+' : groupPedidosCount + groupSnowCount}
                     </span>
                   )}
                 </button>

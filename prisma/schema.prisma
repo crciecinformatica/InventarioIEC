@@ -130,6 +130,7 @@ model maquinas {
   alocacoes          alocacoes_maquinas[]
   localidade_rel     localidades?           @relation(fields: [localidade_id], references: [id], onUpdate: NoAction)
   setor_rel          setores?               @relation(fields: [setor_id], references: [id], onUpdate: NoAction)
+  solicitacoes_snow_itens solicitacoes_snow_itens[]
 
   @@index([identificador], map: "idx_maquinas_identificador")
   @@index([localidade_id], map: "idx_maquinas_localidade_id")
@@ -380,6 +381,62 @@ model audit_log {
   @@index([tabela], map: "idx_audit_log_tabela")
   @@index([registro_id], map: "idx_audit_log_registro_id")
   @@index([created_at(sort: Desc)], map: "idx_audit_log_created_at")
+}
+
+model solicitacoes_snow {
+  id                   String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nome_arquivo         String
+  tipo_arquivo         String
+  assunto_email        String?
+  origem_email         String?
+  recebido_em          DateTime?                 @db.Timestamptz(6)
+  total_recebido       Int                       @default(0)
+  total_atendidas      Int                       @default(0)
+  total_nao_atendidas  Int                       @default(0)
+  total_quarentena     Int                       @default(0)
+  total_inconsistentes Int                       @default(0)
+  status_processamento String
+  erro_processamento   String?
+  criado_em            DateTime?                 @default(now()) @db.Timestamptz(6)
+  itens                solicitacoes_snow_itens[]
+
+  @@index([tipo_arquivo], map: "idx_solicitacoes_snow_tipo_arquivo")
+  @@index([criado_em(sort: Desc)], map: "idx_solicitacoes_snow_criado_em")
+}
+
+model solicitacoes_snow_itens {
+  id                      String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  solicitacao_snow_id     String            @db.Uuid
+  ip                      String?
+  hostname                String?
+  tipo_arquivo            String
+  status                  String
+  motivo                  String?
+  maquina_id              String?           @db.Uuid
+  colaborador_alocado     String?
+  setor_alocado           String?
+  localidade_alocada      String?
+  ultima_revisao          DateTime?         @db.Date
+  data_ultima_solicitacao DateTime?         @db.Timestamptz(6)
+  bloqueado_ate           DateTime?         @db.Timestamptz(6)
+  planner_status          String            @default("pendente")
+  planner_task_id         String?
+  atendente_nome          String?
+  atendente_codigo_pessoa String?
+  assumido_em             DateTime?         @db.Timestamptz(6)
+  concluido_em            DateTime?         @db.Timestamptz(6)
+  conclusao_observacao    String?
+  planner_atualizado_em   DateTime?         @db.Timestamptz(6)
+  criado_em               DateTime?         @default(now()) @db.Timestamptz(6)
+  maquina                 maquinas?         @relation(fields: [maquina_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  solicitacao_snow        solicitacoes_snow @relation(fields: [solicitacao_snow_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([status], map: "idx_solicitacoes_snow_itens_status")
+  @@index([maquina_id], map: "idx_solicitacoes_snow_itens_maquina_id")
+  @@index([ip], map: "idx_solicitacoes_snow_itens_ip")
+  @@index([hostname], map: "idx_solicitacoes_snow_itens_hostname")
+  @@index([planner_status], map: "idx_solicitacoes_snow_itens_planner_status")
+  @@index([atendente_codigo_pessoa], map: "idx_solicitacoes_snow_itens_atendente_codigo")
 }
 
 model forum_topicos {

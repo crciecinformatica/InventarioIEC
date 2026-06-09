@@ -1,8 +1,9 @@
 "use client";
 import { usePermission } from '@/hooks/use-permission'
 
-import { useState } from "react";
-import { X, Pencil, Trash2, Loader2, UserPlus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { X, Pencil, Trash2, Loader2, UserPlus, ExternalLink, ShieldAlert, CheckCircle2, Clock3, AlertTriangle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -36,6 +37,21 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
+const SNOW_MACHINE_ALERT_KEY = 'crc:snow-machine-alert'
+
+type SnowMachineAlert = {
+ title?: string | null
+ status?: string | null
+ arquivo?: string | null
+ recebido_em?: string | null
+ bloqueado_ate?: string | null
+ planner_status?: string | null
+ snow_href?: string | null
+ solicitacao_id?: string | null
+ item_id?: string | null
+ quarantine_href?: string | null
+}
+
 interface Props {
  maquina: Maquina;
  onClose: () => void;
@@ -43,6 +59,7 @@ interface Props {
 }
 
 export function MaquinaModal({ maquina, onClose, onRefresh }: Props) {
+ const router = useRouter()
  const { isAdmin, canRequestInventoryChanges } = usePermission()
  const confirmSolicitacao = useSolicitacaoInventarioConfirm()
  const [mode, setMode] = useState<"view" | "edit">("view");
@@ -51,6 +68,7 @@ export function MaquinaModal({ maquina, onClose, onRefresh }: Props) {
  const [colabId, setColabId] = useState("");
  const [colabNome, setColabNome] = useState("");
  const [savingAlocacao, setSavingAlocacao] = useState(false);
+ const [snowAlert, setSnowAlert] = useState<SnowMachineAlert | null>(null);
  const [setorId, setSetorId] = useState<string | null>(
   maquina.setor_id ?? null
  )
@@ -78,6 +96,80 @@ export function MaquinaModal({ maquina, onClose, onRefresh }: Props) {
    patrimonio_monitor: maquina.patrimonio_monitor,
   },
  });
+
+ useEffect(() => {
+  if (typeof window === 'undefined') return
+  const key = `${SNOW_MACHINE_ALERT_KEY}:${maquina.id}`
+  const raw = window.sessionStorage.getItem(key)
+  if (!raw) {
+   setSnowAlert(null)
+   return
+  }
+  try {
+   const parsed = JSON.parse(raw) as SnowMachineAlert
+   setSnowAlert(parsed)
+  } catch {
+   setSnowAlert(null)
+  }
+ }, [maquina.id])
+
+ function formatSnowDate(value?: string | null) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return new Intl.DateTimeFormat('pt-BR', {
+   day: '2-digit',
+   month: '2-digit',
+   year: 'numeric',
+   hour: '2-digit',
+   minute: '2-digit',
+  }).format(date)
+ }
+
+ function snowAlertView(alert: SnowMachineAlert) {
+  if (alert.status === 'Inconsistente' || alert.status === 'inconsistente') {
+   return {
+    label: 'Solicitação com inconsistência',
+    icon: AlertTriangle,
+    frame: 'border-rose-300/60 bg-rose-50 text-rose-950 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-100',
+    iconBox: 'bg-rose-600 text-white dark:bg-rose-500/20 dark:text-rose-100',
+    badge: 'bg-rose-100 text-rose-800 dark:bg-rose-400/10 dark:text-rose-100',
+    text: 'text-rose-700 dark:text-rose-200',
+    button: 'bg-rose-600 hover:bg-rose-700 text-white',
+   }
+  }
+  if (alert.status === 'Quarentena') {
+   return {
+    label: 'Quarentena',
+    icon: ShieldAlert,
+    frame: 'border-amber-300/60 bg-amber-50 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100',
+    iconBox: 'bg-amber-500 text-white dark:bg-amber-500/20 dark:text-amber-100',
+    badge: 'bg-amber-100 text-amber-800 dark:bg-amber-400/10 dark:text-amber-100',
+    text: 'text-amber-700 dark:text-amber-200',
+    button: 'bg-amber-500 hover:bg-amber-600 text-white',
+  }
+  }
+  if (alert.planner_status === 'concluido') {
+   return {
+    label: 'Concluída',
+    icon: CheckCircle2,
+    frame: 'border-emerald-300/50 bg-emerald-50 text-emerald-950 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100',
+    iconBox: 'bg-emerald-600 text-white dark:bg-emerald-500/20 dark:text-emerald-100',
+    badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-100',
+    text: 'text-emerald-700 dark:text-emerald-200',
+    button: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+   }
+  }
+  return {
+   label: 'Pendente',
+   icon: Clock3,
+   frame: 'border-blue-300/40 bg-blue-50 text-blue-950 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100',
+   iconBox: 'bg-blue-600 text-white dark:bg-blue-500/20 dark:text-blue-100',
+   badge: 'bg-blue-100 text-blue-700 dark:bg-blue-400/10 dark:text-blue-100',
+   text: 'text-blue-700 dark:text-blue-200',
+   button: 'bg-blue-600 hover:bg-blue-700 text-white',
+  }
+ }
 
  function onSubmit(data: FormData) {
   update(maquina.id, { ...data, setor_id: setorId, localidade_id: localidadeId }, {
@@ -203,6 +295,76 @@ export function MaquinaModal({ maquina, onClose, onRefresh }: Props) {
 
      {mode === "view" && (
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
+       {snowAlert && (
+        <div className={`rounded-xl border p-4 shadow-sm ${snowAlertView(snowAlert).frame}`}>
+         <div className="flex items-start gap-3">
+          <span className={`rounded-lg p-2 ${snowAlertView(snowAlert).iconBox}`}>
+           {(() => {
+            const Icon = snowAlertView(snowAlert).icon
+            return <Icon className="h-4 w-4" />
+           })()}
+          </span>
+          <div className="min-w-0 flex-1">
+           <div className="flex flex-wrap items-center gap-2">
+            {snowAlertView(snowAlert).label === 'Solicitação com inconsistência' ? (
+             <p className={`text-sm font-semibold ${snowAlertView(snowAlert).text}`}>Solicitação com inconsistência</p>
+            ) : (
+             <>
+              <p className="text-sm font-semibold">Máquina apontada pelo SNOW</p>
+              <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${snowAlertView(snowAlert).badge}`}>
+               {snowAlertView(snowAlert).label}
+              </span>
+             </>
+            )}
+           </div>
+           <p className={`mt-1 truncate text-xs ${snowAlertView(snowAlert).text}`}>
+            {snowAlert.arquivo || 'Solicitação operacional SNOW'}
+           </p>
+           <div className={`mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs ${snowAlertView(snowAlert).text}`}>
+            {formatSnowDate(snowAlert.recebido_em) && <span>Recebido em {formatSnowDate(snowAlert.recebido_em)}</span>}
+            {formatSnowDate(snowAlert.bloqueado_ate) && <span>Bloqueado até {formatSnowDate(snowAlert.bloqueado_ate)}</span>}
+           </div>
+           {snowAlert.snow_href && (
+            <div className="mt-3 flex flex-wrap gap-2">
+             {snowAlert.quarantine_href && (
+              <button
+               type="button"
+               onClick={() => {
+                onClose()
+                window.setTimeout(() => router.push(snowAlert.quarantine_href as string), 120)
+               }}
+               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${snowAlertView(snowAlert).button}`}
+              >
+               <ShieldAlert className="h-3.5 w-3.5" />
+               Abrir quarentena
+              </button>
+             )}
+             <button
+              type="button"
+              onClick={() => {
+               onClose()
+               window.setTimeout(() => router.push(snowAlert.snow_href as string), 120)
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${snowAlertView(snowAlert).button}`}
+             >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Abrir solicitação
+             </button>
+            </div>
+           )}
+          </div>
+          <button
+           type="button"
+           onClick={() => setSnowAlert(null)}
+           className="rounded-lg p-1 opacity-70 transition hover:bg-white/60 hover:opacity-100 dark:hover:bg-slate-900/60"
+           aria-label="Ocultar aviso SNOW"
+          >
+           <X className="h-4 w-4" />
+          </button>
+         </div>
+        </div>
+       )}
+
        {maquina.alocacao_ativa ? (
         <AlocacoesAtivasSection
          itemId={maquina.id}
