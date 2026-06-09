@@ -17,6 +17,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         itens: {
           orderBy: { criado_em: 'asc' },
           include: {
+            solicitacao_snow: {
+              select: {
+                id: true,
+                nome_arquivo: true,
+                tipo_arquivo: true,
+                origem_email: true,
+                recebido_em: true,
+                criado_em: true,
+              },
+            },
             maquina: {
               select: {
                 id: true,
@@ -32,7 +42,41 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
     if (!item) return NextResponse.json({ error: 'Solicitação SNOW não encontrada' }, { status: 404 })
 
-    return NextResponse.json(item)
+    const repeatedMachineIds = item.itens
+      .filter(snowItem => snowItem.status === 'em_quarentena' && snowItem.maquina_id)
+      .map(snowItem => snowItem.maquina_id as string)
+
+    if (repeatedMachineIds.length === 0) return NextResponse.json(item)
+
+    const historico = await prisma.solicitacoes_snow_itens.findMany({
+      where: {
+        maquina_id: { in: repeatedMachineIds },
+        status: { in: ['atendida', 'em_quarentena'] },
+      },
+      orderBy: { criado_em: 'desc' },
+      include: {
+        solicitacao_snow: {
+          select: {
+            id: true,
+            nome_arquivo: true,
+            tipo_arquivo: true,
+            origem_email: true,
+            recebido_em: true,
+            criado_em: true,
+          },
+        },
+      },
+    })
+
+    return NextResponse.json({
+      ...item,
+      itens: item.itens.map(snowItem => ({
+        ...snowItem,
+        repeticoes: snowItem.maquina_id
+          ? historico.filter(historyItem => historyItem.maquina_id === snowItem.maquina_id)
+          : [],
+      })),
+    })
   } catch (error) {
     console.error('[GET /api/snow/solicitacoes/[id]]', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

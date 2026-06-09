@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { isSnowIntegrationAuthorized } from '@/lib/snow/auth'
-import { parseOptionalDate } from '@/lib/snow/normalizers'
 import { processSnowWorkbook } from '@/lib/snow/service'
 import { SnowProcessingError } from '@/lib/snow/types'
 
 export const runtime = 'nodejs'
+const SNOW_DEFAULT_ORIGEM_EMAIL = 'smcgti.snow@pucminas.br'
 
 function isXlsxFile(file: File) {
   return file.name.toLowerCase().endsWith('.xlsx')
@@ -30,9 +30,9 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer())
     const result = await processSnowWorkbook(buffer, {
       nomeArquivo: file.name,
-      origemEmail: String(formData.get('origem_email') ?? '') || null,
+      origemEmail: String(formData.get('origem_email') ?? '') || SNOW_DEFAULT_ORIGEM_EMAIL,
       assuntoEmail: String(formData.get('assunto_email') ?? '') || null,
-      recebidoEm: parseOptionalDate(formData.get('recebido_em')),
+      recebidoEm: new Date(),
     })
 
     return NextResponse.json(result)

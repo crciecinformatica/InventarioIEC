@@ -10,8 +10,12 @@ const STATUS_PROCESSAMENTO = new Set(['processado', 'erro_processamento'])
 
 function parseDateParam(value: string | null, endOfDay = false) {
   if (!value) return null
-  const date = new Date(value)
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value)
   if (Number.isNaN(date.getTime())) return null
+  if (!endOfDay) date.setHours(0, 0, 0, 0)
   if (endOfDay) date.setHours(23, 59, 59, 999)
   return date
 }

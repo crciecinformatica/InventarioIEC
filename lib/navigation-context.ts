@@ -9,6 +9,7 @@ export type InspectResourceType =
   | 'movimentacao'
   | 'usuario'
   | 'pedido'
+  | 'snow'
   | 'forum'
   | 'forum_documentos'
 
@@ -40,6 +41,7 @@ const RESOURCE_BY_PATH: Record<string, { type: InspectResourceType; label: strin
   '/movimentacoes': { type: 'movimentacao', label: 'Auditoria' },
   '/usuarios': { type: 'usuario', label: 'Usuário' },
   '/pedidos': { type: 'pedido', label: 'Pedido' },
+  '/snow': { type: 'snow', label: 'Snow' },
   '/forum': { type: 'forum', label: 'Fórum' },
   '/forum/documentos': { type: 'forum_documentos', label: 'Documentos' },
 }

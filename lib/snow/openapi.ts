@@ -58,7 +58,8 @@ export const snowOpenApiSpec = {
                   origem_email: {
                     type: 'string',
                     nullable: true,
-                    example: 'snow@empresa.com',
+                    example: 'smcgti.snow@pucminas.br',
+                    default: 'smcgti.snow@pucminas.br',
                   },
                   assunto_email: {
                     type: 'string',
@@ -70,6 +71,7 @@ export const snowOpenApiSpec = {
                     format: 'date-time',
                     nullable: true,
                     example: '2026-06-08T09:30:00-03:00',
+                    description: 'Campo legado opcional. O histórico operacional usa a data/hora real em que o POST chegou à API.',
                   },
                 },
               },
@@ -140,6 +142,38 @@ export const snowOpenApiSpec = {
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/SnowOverview' },
+              },
+            },
+          },
+          '401': {
+            description: 'Usuário não autenticado.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/api/snow/count': {
+      get: {
+        tags: ['SNOW - Chamadas internas'],
+        summary: 'Contar solicitações SNOW pendentes',
+        description:
+          'Retorna quantas solicitações SNOW ainda possuem pelo menos uma máquina encontrada sem `planner_status = concluido`. Máquinas em quarentena são apenas controle operacional e não entram no atendimento do Planner.',
+        security: [{ nextAuthSession: [] }],
+        responses: {
+          '200': {
+            description: 'Contagem retornada com sucesso.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    count: { type: 'integer', example: 3 },
+                  },
+                },
               },
             },
           },
@@ -312,6 +346,15 @@ export const snowOpenApiSpec = {
               example: 'atendida,em_quarentena',
             },
             description: 'Lista separada por vírgulas com os status dos itens.',
+          },
+          {
+            name: 'planner_status',
+            in: 'query',
+            schema: {
+              type: 'string',
+              example: 'pendente,concluido',
+            },
+            description: 'Lista separada por vírgulas com status de acompanhamento do Planner.',
           },
           {
             name: 'inicio',
@@ -738,6 +781,9 @@ export const snowOpenApiSpec = {
           nao_atendidas: { type: 'integer', example: 180 },
           em_quarentena: { type: 'integer', example: 30 },
           inconsistentes: { type: 'integer', example: 0 },
+          planner_pendentes: { type: 'integer', example: 12 },
+          planner_em_atendimento: { type: 'integer', example: 3 },
+          planner_resolvidas: { type: 'integer', example: 4 },
           por_tipo: {
             type: 'array',
             items: {

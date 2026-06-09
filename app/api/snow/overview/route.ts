@@ -7,8 +7,12 @@ export const runtime = 'nodejs'
 
 function parseDateParam(value: string | null, endOfDay = false) {
   if (!value) return null
-  const date = new Date(value)
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value)
   if (Number.isNaN(date.getTime())) return null
+  if (!endOfDay) date.setHours(0, 0, 0, 0)
   if (endOfDay) date.setHours(23, 59, 59, 999)
   return date
 }
@@ -49,6 +53,37 @@ export async function GET(request: Request) {
       _sum: { total_recebido: true },
     })
 
+    const itemWhere = inicio || fim
+      ? {
+          criado_em: {
+            ...(inicio ? { gte: inicio } : {}),
+            ...(fim ? { lte: fim } : {}),
+          },
+          status: 'atendida',
+        }
+      : { status: 'atendida' }
+
+    const [plannerPendentes, plannerEmAtendimento, plannerResolvidas] = await Promise.all([
+      prisma.solicitacoes_snow_itens.count({
+        where: {
+          ...itemWhere,
+          planner_status: 'pendente',
+        },
+      }),
+      prisma.solicitacoes_snow_itens.count({
+        where: {
+          ...itemWhere,
+          planner_status: 'assumido',
+        },
+      }),
+      prisma.solicitacoes_snow_itens.count({
+        where: {
+          ...itemWhere,
+          planner_status: 'concluido',
+        },
+      }),
+    ])
+
     return NextResponse.json({
       total_solicitacoes: totals._count._all ?? 0,
       total_itens: totals._sum.total_recebido ?? 0,
@@ -56,6 +91,9 @@ export async function GET(request: Request) {
       nao_atendidas: totals._sum.total_nao_atendidas ?? 0,
       em_quarentena: totals._sum.total_quarentena ?? 0,
       inconsistentes: totals._sum.total_inconsistentes ?? 0,
+      planner_pendentes: plannerPendentes,
+      planner_em_atendimento: plannerEmAtendimento,
+      planner_resolvidas: plannerResolvidas,
       por_tipo: byType,
     })
   } catch (error) {
@@ -67,6 +105,9 @@ export async function GET(request: Request) {
       nao_atendidas: 0,
       em_quarentena: 0,
       inconsistentes: 0,
+      planner_pendentes: 0,
+      planner_em_atendimento: 0,
+      planner_resolvidas: 0,
       por_tipo: [],
     }, { status: 500 })
   }
