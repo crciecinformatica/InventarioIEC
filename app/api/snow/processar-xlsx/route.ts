@@ -4,6 +4,7 @@ import { processSnowWorkbook } from '@/lib/snow/service'
 import { SnowProcessingError } from '@/lib/snow/types'
 
 export const runtime = 'nodejs'
+export const maxDuration = 60
 const SNOW_DEFAULT_ORIGEM_EMAIL = 'smcgti.snow@pucminas.br'
 
 function isXlsxFile(file: File) {
