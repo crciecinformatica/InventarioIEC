@@ -25,15 +25,15 @@ export function buildSnowProcessResult(arquivo: string, tipoRelatorio: SnowProce
     descricao,
     resumo: {
       total_recebido: itens.length,
-      atendidas: atendidas.length,
+      encontradas: atendidas.length,
       nao_atendidas: naoAtendidas.length,
       em_quarentena: emQuarentena.length,
       inconsistentes: inconsistentes.length,
     },
     sections: [
       {
-        key: 'atendidas',
-        titulo: 'Máquinas atendidas',
+        key: 'encontradas',
+        titulo: 'Máquinas encontradas',
         descricao: 'Máquinas encontradas no inventário e liberadas para abertura de chamado no Planner.',
         total: atendidas.length,
         itens: atendidas,

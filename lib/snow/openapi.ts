@@ -732,14 +732,14 @@ export const snowOpenApiSpec = {
             type: 'object',
             required: [
               'total_recebido',
-              'atendidas',
+              'encontradas',
               'nao_atendidas',
               'em_quarentena',
               'inconsistentes',
             ],
             properties: {
               total_recebido: { type: 'integer', example: 16 },
-              atendidas: { type: 'integer', example: 4 },
+              encontradas: { type: 'integer', example: 4 },
               nao_atendidas: { type: 'integer', example: 12 },
               em_quarentena: { type: 'integer', example: 0 },
               inconsistentes: { type: 'integer', example: 0 },
@@ -748,19 +748,19 @@ export const snowOpenApiSpec = {
           sections: {
             type: 'array',
             description:
-              'Seções pensadas para o Power Automate. Por padrão carrega apenas `atendidas` e `inconsistentes`; não atendidas e quarentena ficam no histórico/interface.',
+              'Seções pensadas para o Power Automate. Por padrão carrega apenas `encontradas` e `inconsistentes`; não atendidas e quarentena ficam no histórico/interface.',
             items: {
               type: 'object',
               required: ['key', 'titulo', 'descricao', 'total', 'itens'],
               properties: {
                 key: {
                   type: 'string',
-                  enum: ['atendidas', 'inconsistentes'],
-                  example: 'atendidas',
+                  enum: ['encontradas', 'inconsistentes'],
+                  example: 'encontradas',
                 },
                 titulo: {
                   type: 'string',
-                  example: 'Máquinas atendidas',
+                  example: 'Máquinas encontradas',
                 },
                 descricao: {
                   type: 'string',

@@ -33,15 +33,15 @@ Usar `multipart/form-data`:
   "tipo_relatorio": "computadores_a_serem_arquivados",
   "resumo": {
     "total_recebido": 16,
-    "atendidas": 4,
+    "encontradas": 4,
     "nao_atendidas": 12,
     "em_quarentena": 0,
     "inconsistentes": 0
   },
   "sections": [
     {
-      "key": "atendidas",
-      "titulo": "Máquinas atendidas",
+      "key": "encontradas",
+      "titulo": "Máquinas encontradas",
       "descricao": "Máquinas encontradas no inventário e liberadas para abertura de chamado no Planner.",
       "total": 4,
       "itens": []
@@ -64,8 +64,8 @@ Usar `multipart/form-data`:
 3. Filtrar anexos com extensão `.xlsx`.
 4. Enviar o anexo para o endpoint usando uma ação HTTP com `multipart/form-data`.
 5. Ler o JSON retornado.
-6. Localizar em `sections` a seção com `key = "atendidas"`.
-7. Iterar `sections[].itens` da seção `atendidas` para abertura de chamados no Planner.
+6. Localizar em `sections` a seção com `key = "encontradas"`.
+7. Iterar `sections[].itens` da seção `encontradas` para abertura de chamados no Planner.
 8. Guardar no card/chamado do Planner o campo `id` do item SNOW.
 9. Quando alguém assumir o chamado, chamar `POST /api/snow/itens/{id}/assumir`.
 10. Quando o chamado for concluído, chamar `POST /api/snow/itens/{id}/concluir`.
