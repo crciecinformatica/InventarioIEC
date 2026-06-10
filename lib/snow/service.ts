@@ -2,13 +2,13 @@ import { parseSnowWorkbook } from './parsers/workbook'
 import { buildQuarantineFields } from './quarentena'
 import {
   createSnowSolicitation,
-  findLastAttendedSnowItem,
-  findSnowMachineByHostname,
-  findSnowMachineByIp,
+  findLastAttendedSnowItems,
+  findSnowMachinesByHostnames,
+  findSnowMachinesByIps,
 } from './repositories'
 import { resolveMachineMatch } from './matching'
-import { formatDateOnly } from './normalizers'
-import type { SnowMetadata, SnowProcessResult, SnowProcessedItem } from './types'
+import { formatDateOnly, normalizeHostname, normalizeIp } from './normalizers'
+import type { SnowMachineMatch, SnowMetadata, SnowProcessResult, SnowProcessedItem } from './types'
 
 export function buildSnowProcessResult(arquivo: string, tipoRelatorio: SnowProcessResult['tipo_relatorio'], itens: SnowProcessedItem[]): SnowProcessResult {
   const atendidas = itens.filter(item => item.status === 'atendida')
@@ -53,15 +53,35 @@ export function buildSnowProcessResult(arquivo: string, tipoRelatorio: SnowProce
 
 export async function processSnowWorkbook(buffer: Buffer, metadata: SnowMetadata): Promise<SnowProcessResult> {
   const { tipoRelatorio, itens } = parseSnowWorkbook(buffer, metadata)
+  const startedAt = Date.now()
+
+  console.info('[snow process] relatório normalizado', {
+    arquivo: metadata.nomeArquivo,
+    tipoRelatorio,
+    total: itens.length,
+  })
 
   const processed: SnowProcessedItem[] = []
+  const [machinesByIpList, machinesByHostnameList] = await Promise.all([
+    findSnowMachinesByIps(itens.map(item => item.ip).filter((ip): ip is string => Boolean(ip))),
+    findSnowMachinesByHostnames(itens.map(item => item.hostname).filter((hostname): hostname is string => Boolean(hostname))),
+  ])
+  const machinesByIp = new Map<string, SnowMachineMatch>()
+  const machinesByHostname = new Map<string, SnowMachineMatch>()
+
+  for (const machine of machinesByIpList) {
+    const ip = normalizeIp(machine.endereco_ip)
+    if (ip) machinesByIp.set(ip, machine)
+  }
+
+  for (const machine of machinesByHostnameList) {
+    const hostname = normalizeHostname(machine.nome_host)
+    if (hostname) machinesByHostname.set(hostname, machine)
+  }
 
   for (const item of itens) {
-    const [machineByIp, machineByHostname] = await Promise.all([
-      findSnowMachineByIp(item.ip),
-      findSnowMachineByHostname(item.hostname),
-    ])
-
+    const machineByIp = item.ip ? machinesByIp.get(item.ip) ?? null : null
+    const machineByHostname = item.hostname ? machinesByHostname.get(item.hostname) ?? null : null
     const matched = resolveMachineMatch({
       ip: item.ip,
       hostname: item.hostname,
@@ -80,25 +100,41 @@ export async function processSnowWorkbook(buffer: Buffer, metadata: SnowMetadata
       continue
     }
 
-    const lastAttended = await findLastAttendedSnowItem(matched.maquina_id)
-    const quarantine = buildQuarantineFields(lastAttended?.criado_em ?? null)
-
     processed.push({
       ...matched,
-      status: quarantine.emQuarentena ? 'em_quarentena' : 'atendida',
-      motivo: quarantine.emQuarentena
-        ? 'Máquina já teve solicitação atendida nos últimos 15 dias'
-        : matched.motivo,
       ultima_revisao: formatDateOnly(matched.ultima_revisao),
-      data_ultima_solicitacao: quarantine.dataUltimaSolicitacao,
-      bloqueado_ate: quarantine.bloqueadoAte,
+      data_ultima_solicitacao: null,
+      bloqueado_ate: null,
     })
+  }
+
+  const lastAttendedByMachine = await findLastAttendedSnowItems(
+    processed
+      .filter(item => item.status === 'atendida' && item.maquina_id)
+      .map(item => item.maquina_id as string)
+  )
+
+  for (const item of processed) {
+    if (item.status !== 'atendida' || !item.maquina_id) continue
+    const quarantine = buildQuarantineFields(lastAttendedByMachine.get(item.maquina_id) ?? null)
+    if (!quarantine.emQuarentena) continue
+
+    item.status = 'em_quarentena'
+    item.motivo = 'Máquina já teve solicitação atendida nos últimos 15 dias'
+    item.data_ultima_solicitacao = quarantine.dataUltimaSolicitacao
+    item.bloqueado_ate = quarantine.bloqueadoAte
   }
 
   const created = await createSnowSolicitation({
     metadata,
     tipoRelatorio,
     itens: processed,
+  })
+
+  console.info('[snow process] relatório registrado', {
+    arquivo: metadata.nomeArquivo,
+    total: processed.length,
+    duracaoMs: Date.now() - startedAt,
   })
 
   return buildSnowProcessResult(metadata.nomeArquivo, tipoRelatorio, created.itens as SnowProcessedItem[])

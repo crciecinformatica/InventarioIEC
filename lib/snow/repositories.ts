@@ -38,6 +38,30 @@ export async function findSnowMachineByHostname(hostname: string | null): Promis
   }) as Promise<SnowMachineMatch | null>
 }
 
+export async function findSnowMachinesByIps(ips: string[]): Promise<SnowMachineMatch[]> {
+  const uniqueIps = Array.from(new Set(ips.filter(Boolean)))
+  if (uniqueIps.length === 0) return []
+
+  return prisma.maquinas.findMany({
+    where: {
+      OR: uniqueIps.map(ip => ({ endereco_ip: { equals: ip, mode: 'insensitive' } })),
+    },
+    include: machineInclude,
+  }) as Promise<SnowMachineMatch[]>
+}
+
+export async function findSnowMachinesByHostnames(hostnames: string[]): Promise<SnowMachineMatch[]> {
+  const uniqueHostnames = Array.from(new Set(hostnames.filter(Boolean)))
+  if (uniqueHostnames.length === 0) return []
+
+  return prisma.maquinas.findMany({
+    where: {
+      OR: uniqueHostnames.map(hostname => ({ nome_host: { equals: hostname, mode: 'insensitive' } })),
+    },
+    include: machineInclude,
+  }) as Promise<SnowMachineMatch[]>
+}
+
 export async function findLastAttendedSnowItem(maquinaId: string) {
   return prisma.solicitacoes_snow_itens.findFirst({
     where: {
@@ -48,6 +72,30 @@ export async function findLastAttendedSnowItem(maquinaId: string) {
     orderBy: { criado_em: 'desc' },
     select: { criado_em: true },
   }) as Promise<{ criado_em: Date | null } | null>
+}
+
+export async function findLastAttendedSnowItems(maquinaIds: string[]) {
+  const uniqueIds = Array.from(new Set(maquinaIds.filter(Boolean)))
+  if (uniqueIds.length === 0) return new Map<string, Date>()
+
+  const rows = await prisma.solicitacoes_snow_itens.findMany({
+    where: {
+      maquina_id: { in: uniqueIds },
+      status: 'atendida',
+      criado_em: { gte: quarantineStartDate() },
+    },
+    orderBy: { criado_em: 'desc' },
+    select: { maquina_id: true, criado_em: true },
+  })
+
+  const latestByMachine = new Map<string, Date>()
+  for (const row of rows) {
+    if (row.maquina_id && row.criado_em && !latestByMachine.has(row.maquina_id)) {
+      latestByMachine.set(row.maquina_id, row.criado_em)
+    }
+  }
+
+  return latestByMachine
 }
 
 export async function createSnowSolicitation(params: {
