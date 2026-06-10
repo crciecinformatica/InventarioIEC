@@ -75,13 +75,13 @@ export type SnowProcessResult = {
   descricao: string
   resumo: {
     total_recebido: number
-    atendidas: number
+    encontradas: number
     nao_atendidas: number
     em_quarentena: number
     inconsistentes: number
   }
   sections: Array<{
-    key: 'atendidas' | 'inconsistentes'
+    key: 'encontradas' | 'inconsistentes'
     titulo: string
     descricao: string
     total: number

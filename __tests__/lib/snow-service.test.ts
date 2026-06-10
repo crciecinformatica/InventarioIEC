@@ -19,7 +19,7 @@ function item(status: SnowProcessedItem['status']): SnowProcessedItem {
 }
 
 describe('lib/snow/service', () => {
-  it('retorna sections apenas com atendidas e inconsistentes para automação', () => {
+  it('retorna sections apenas com encontradas e inconsistentes para automação', () => {
     const result = buildSnowProcessResult('snow.xlsx', 'computadores_a_serem_arquivados', [
       item('atendida'),
       item('nao_atendida'),
@@ -29,12 +29,12 @@ describe('lib/snow/service', () => {
 
     expect(result.resumo).toEqual({
       total_recebido: 4,
-      atendidas: 1,
+      encontradas: 1,
       nao_atendidas: 1,
       em_quarentena: 1,
       inconsistentes: 1,
     })
-    expect(result.sections.map(section => section.key)).toEqual(['atendidas', 'inconsistentes'])
+    expect(result.sections.map(section => section.key)).toEqual(['encontradas', 'inconsistentes'])
     expect(result.descricao).toContain('1 inconsistência')
     expect(result.sections.flatMap(section => section.itens).map(sectionItem => sectionItem.status)).toEqual([
       'atendida',
