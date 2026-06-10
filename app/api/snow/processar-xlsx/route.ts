@@ -11,6 +11,20 @@ function isXlsxFile(file: File) {
   return file.name.toLowerCase().endsWith('.xlsx')
 }
 
+function normalizeWorkbookBuffer(buffer: Buffer) {
+  if (buffer.subarray(0, 2).toString('utf8') === 'PK') return buffer
+
+  const text = buffer.toString('utf8').trim()
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(text)) return buffer
+
+  try {
+    const decoded = Buffer.from(text.replace(/\s+/g, ''), 'base64')
+    return decoded.subarray(0, 2).toString('utf8') === 'PK' ? decoded : buffer
+  } catch {
+    return buffer
+  }
+}
+
 export async function POST(request: Request) {
   if (!isSnowIntegrationAuthorized(request)) {
     return NextResponse.json({ error: 'Token de integração SNOW inválido' }, { status: 401 })
@@ -28,7 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Extensão inválida. Envie um arquivo .xlsx' }, { status: 400 })
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer())
+    const buffer = normalizeWorkbookBuffer(Buffer.from(await file.arrayBuffer()))
     const result = await processSnowWorkbook(buffer, {
       nomeArquivo: file.name,
       origemEmail: String(formData.get('origem_email') ?? '') || SNOW_DEFAULT_ORIGEM_EMAIL,
