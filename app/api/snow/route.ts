@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { snowOpenApiSpec } from '@/lib/snow/openapi'
+import { buildSnowOpenApiSpec } from '@/lib/snow/openapi'
 
 export const runtime = 'nodejs'
 
-function swaggerHtml() {
-  const specJson = JSON.stringify(snowOpenApiSpec)
+function swaggerHtml(origin: string) {
+  const specJson = JSON.stringify(buildSnowOpenApiSpec(origin))
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -222,13 +222,13 @@ function swaggerHtml() {
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
+  const { origin, searchParams } = new URL(request.url)
 
   if (searchParams.get('format') === 'json') {
-    return NextResponse.json(snowOpenApiSpec)
+    return NextResponse.json(buildSnowOpenApiSpec(origin))
   }
 
-  return new NextResponse(swaggerHtml(), {
+  return new NextResponse(swaggerHtml(origin), {
     headers: {
       'content-type': 'text/html; charset=utf-8',
     },

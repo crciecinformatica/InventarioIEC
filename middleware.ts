@@ -8,12 +8,12 @@ const SNOW_EXTERNAL_PATHS = [
 ]
 
 function hasSnowIntegrationToken(req: Request) {
-  const expected = process.env.SNOW_INTEGRATION_TOKEN
+  const expected = process.env.SNOW_INTEGRATION_TOKEN?.trim()
   if (!expected) return false
 
   const authorization = req.headers.get('authorization') || ''
-  const apiKey = req.headers.get('x-api-key') || ''
-  const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1]
+  const apiKey = req.headers.get('x-api-key')?.trim() || ''
+  const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1]?.trim()
 
   return bearer === expected || apiKey === expected
 }
