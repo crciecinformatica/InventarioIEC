@@ -1,3 +1,5 @@
+const PRODUCTION_API_URL = 'https://inventario-iec.vercel.app'
+
 export const snowOpenApiSpec = {
   openapi: '3.0.3',
   info: {
@@ -8,8 +10,8 @@ export const snowOpenApiSpec = {
   },
   servers: [
     {
-      url: 'http://localhost:3000',
-      description: 'Ambiente local',
+      url: PRODUCTION_API_URL,
+      description: 'Produção',
     },
   ],
   tags: [
@@ -873,3 +875,23 @@ export const snowOpenApiSpec = {
     },
   },
 } as const
+
+export function buildSnowOpenApiSpec(origin?: string | null) {
+  const normalizedOrigin = origin?.replace(/\/$/, '')
+  const servers = normalizedOrigin
+    ? [
+        {
+          url: normalizedOrigin,
+          description: normalizedOrigin === PRODUCTION_API_URL ? 'Produção' : 'Ambiente atual',
+        },
+        ...(normalizedOrigin === PRODUCTION_API_URL
+          ? []
+          : [{ url: PRODUCTION_API_URL, description: 'Produção' }]),
+      ]
+    : snowOpenApiSpec.servers
+
+  return {
+    ...snowOpenApiSpec,
+    servers,
+  }
+}
