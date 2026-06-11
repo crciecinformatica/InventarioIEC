@@ -10,18 +10,19 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   try {
-    const count = await prisma.solicitacoes_snow.count({
-      where: {
-        itens: {
-          some: {
-            status: 'atendida',
-            planner_status: { not: 'concluido' },
-          },
-        },
-      },
-    })
+    const [result] = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM solicitacoes_snow s
+      WHERE s.total_atendidas > (
+        SELECT COUNT(*)::integer
+        FROM solicitacoes_snow_itens i
+        WHERE i.solicitacao_snow_id = s.id
+          AND i.status IN ('atendida', 'inconsistente')
+          AND i.planner_status = 'concluido'
+      )
+    `
 
-    return NextResponse.json({ count })
+    return NextResponse.json({ count: Number(result?.count ?? 0) })
   } catch (error) {
     console.error('[GET /api/snow/count]', error)
     return NextResponse.json({ count: 0 }, { status: 500 })

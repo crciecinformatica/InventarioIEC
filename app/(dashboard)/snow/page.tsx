@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react'
 import { DataTable } from '@/components/tables/data-table'
+import { OverviewExportMenu, type OverviewExportConfig } from '@/components/tables/overview-export-menu'
 import { PageHeader } from '@/components/layout/page-header'
 import { cn } from '@/lib/utils'
 import { pushInspectHistory, writePendingInspectPreview } from '@/lib/navigation-context'
@@ -41,6 +42,10 @@ type SnowSolicitacao = {
   status_processamento: string
   erro_processamento: string | null
   criado_em: string | null
+  planner_pendentes?: number
+  planner_em_atendimento?: number
+  planner_concluidas?: number
+  planner_resolvida?: boolean
 }
 
 type SnowItem = {
@@ -223,11 +228,26 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function ItemStatusIcon({ status }: { status: string }) {
-  if (status === 'atendida') return <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-  if (status === 'em_quarentena') return <ShieldAlert className="h-5 w-5 text-amber-300" />
-  if (status === 'inconsistente') return <AlertTriangle className="h-5 w-5 text-rose-300" />
-  return <Circle className="h-5 w-5 text-slate-500" />
+function OperationalStatusIcon({ item }: { item: Pick<SnowItem, 'status' | 'planner_status'> }) {
+  if (item.status === 'em_quarentena') return <ShieldAlert className="h-5 w-5 text-amber-300" />
+  if (item.status === 'nao_atendida') return <Circle className="h-5 w-5 text-slate-500" />
+  if ((item.planner_status ?? 'pendente') === 'concluido') return <MonitorCheck className="h-5 w-5 text-emerald-400" />
+  if ((item.planner_status ?? 'pendente') === 'assumido') return <Laptop className="h-5 w-5 text-cyan-400" />
+  return <Clock3 className="h-5 w-5 text-blue-400" />
+}
+
+function operationalStatusLabel(item: Pick<SnowItem, 'status' | 'planner_status'>) {
+  if (item.status === 'em_quarentena') return 'Quarentena'
+  if (item.status === 'nao_atendida') return 'Fora do inventário'
+  return STATUS_LABELS[item.planner_status || 'pendente'] ?? 'Pendente'
+}
+
+function isOriginInconsistent(item: Pick<SnowItem, 'status'>) {
+  return item.status === 'inconsistente'
+}
+
+function isOperationalItem(item: Pick<SnowItem, 'status'>) {
+  return item.status === 'atendida' || item.status === 'inconsistente'
 }
 
 function MetricCard({
@@ -308,6 +328,8 @@ export default function SnowPage() {
   })
   const [data, setData] = useState<SnowSolicitacao[]>([])
   const [machineItems, setMachineItems] = useState<SnowItem[]>([])
+  const [exportSolicitacoes, setExportSolicitacoes] = useState<SnowSolicitacao[]>([])
+  const [exportMachineItems, setExportMachineItems] = useState<SnowItem[]>([])
   const [total, setTotal] = useState(0)
   const [machineTotal, setMachineTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -326,6 +348,7 @@ export default function SnowPage() {
     planner_resolvidas: 0,
   })
   const [selected, setSelected] = useState<SnowDetalhe | null>(null)
+  const [operationalInspect, setOperationalInspect] = useState<SnowItem | null>(null)
   const [quarantineInspect, setQuarantineInspect] = useState<SnowItem | null>(null)
   const [inconsistentInspect, setInconsistentInspect] = useState<SnowItem | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -333,12 +356,12 @@ export default function SnowPage() {
 
   const dateRange = useMemo(() => dateRangeForScope(dateScope), [dateScope])
   const machineFilterQuery = useMemo<{ status: string; planner_status?: string }>(() => {
-    if (machineFilter === 'pendentes') return { status: 'atendida', planner_status: 'pendente' }
-    if (machineFilter === 'em_atendimento') return { status: 'atendida', planner_status: 'assumido' }
-    if (machineFilter === 'resolvidas') return { status: 'atendida', planner_status: 'concluido' }
+    if (machineFilter === 'pendentes') return { status: 'atendida,inconsistente', planner_status: 'pendente' }
+    if (machineFilter === 'em_atendimento') return { status: 'atendida,inconsistente', planner_status: 'assumido' }
+    if (machineFilter === 'resolvidas') return { status: 'atendida,inconsistente', planner_status: 'concluido' }
     if (machineFilter === 'quarentena') return { status: 'em_quarentena' }
     if (machineFilter === 'inconsistentes') return { status: 'inconsistente' }
-    return { status: 'atendida', planner_status: 'pendente' }
+    return { status: 'atendida,inconsistente', planner_status: 'pendente' }
   }, [machineFilter])
 
   const snowReturnHref = useMemo(() => {
@@ -470,6 +493,40 @@ export default function SnowPage() {
   }, [machinePage, dateRange, machineFilterQuery])
 
   useEffect(() => {
+    let cancelled = false
+    async function loadExportRows() {
+      try {
+        if (viewMode === 'solicitacoes') {
+          const params = new URLSearchParams({ page: '1', limit: '10000' })
+          if (dateRange.inicio) params.set('inicio', dateRange.inicio)
+          if (dateRange.fim) params.set('fim', dateRange.fim)
+          const res = await fetch(`/api/snow/solicitacoes?${params}`)
+          const json = await res.json()
+          if (!cancelled) setExportSolicitacoes(json.data ?? [])
+          return
+        }
+
+        const params = new URLSearchParams({ page: '1', limit: '10000', status: machineFilterQuery.status })
+        if (machineFilterQuery.planner_status) params.set('planner_status', machineFilterQuery.planner_status)
+        if (dateRange.inicio) params.set('inicio', dateRange.inicio)
+        if (dateRange.fim) params.set('fim', dateRange.fim)
+        const res = await fetch(`/api/snow/itens?${params}`)
+        const json = await res.json()
+        if (!cancelled) setExportMachineItems(json.data ?? [])
+      } catch (error) {
+        console.error('[snow export rows]', error)
+        if (!cancelled) {
+          if (viewMode === 'solicitacoes') setExportSolicitacoes(data)
+          else setExportMachineItems(machineItems)
+        }
+      }
+    }
+
+    loadExportRows()
+    return () => { cancelled = true }
+  }, [data, dateRange, machineFilterQuery, machineItems, viewMode])
+
+  useEffect(() => {
     const itemId = searchParams.get('item')
     if (viewMode !== 'maquinas' || machineFilter !== 'quarentena' || !itemId || quarantineInspect?.id === itemId) return
     const item = machineItems.find(candidate => candidate.id === itemId)
@@ -528,11 +585,21 @@ export default function SnowPage() {
 
   function openInconsistentInspect(item: SnowItem) {
     if (item.status !== 'inconsistente') return
+    setOperationalInspect(null)
     setInconsistentInspect(item)
+  }
+
+  function openOperationalInspect(item: SnowItem) {
+    if (!isOperationalItem(item)) return
+    setQuarantineInspect(null)
+    setInconsistentInspect(null)
+    setOperationalInspect(item)
   }
 
   async function openQuarantineInspect(item: SnowItem) {
     if (item.status !== 'em_quarentena') return
+    setOperationalInspect(null)
+    setInconsistentInspect(null)
     setNavigatingItemId(item.id)
     try {
       const solicitacaoId = item.solicitacao_snow?.id
@@ -555,10 +622,11 @@ export default function SnowPage() {
   function openMachineInspect(item: SnowItem) {
     if (!item.maquina_id || !['atendida', 'em_quarentena', 'inconsistente'].includes(item.status)) return
     const title = machineTitle(item)
+    const hasOriginInconsistency = isOriginInconsistent(item)
     const subtitle = item.status === 'em_quarentena'
       ? 'Recorrência SNOW em menos de 15 dias'
-      : item.status === 'inconsistente'
-        ? 'Inconsistência de IP/hostname no SNOW'
+      : hasOriginInconsistency
+        ? `${operationalStatusLabel(item)} · Inconsistente por origem SNOW`
         : 'Encontrada pelo fluxo SNOW'
     const href = `/maquinas?inspect=${item.maquina_id}`
     setNavigatingItemId(item.id)
@@ -576,7 +644,8 @@ export default function SnowPage() {
       })
       window.sessionStorage.setItem(`${SNOW_MACHINE_ALERT_KEY}:${item.maquina_id}`, JSON.stringify({
         title,
-        status: STATUS_LABELS[item.status] ?? item.status,
+        status: operationalStatusLabel(item),
+        origin_inconsistent: hasOriginInconsistency,
         arquivo: item.solicitacao_snow?.nome_arquivo ?? selected?.nome_arquivo ?? null,
         recebido_em: item.solicitacao_snow?.recebido_em ?? item.solicitacao_snow?.criado_em ?? selected?.recebido_em ?? selected?.criado_em ?? null,
         bloqueado_ate: item.bloqueado_ate ?? null,
@@ -622,8 +691,34 @@ export default function SnowPage() {
     },
     {
       accessorKey: 'total_atendidas',
-      header: 'Encontradas',
-      cell: ({ row }) => row.original.total_atendidas.toLocaleString('pt-BR'),
+      header: 'Operacional',
+      cell: ({ row }) => {
+        const encontradas = row.original.total_atendidas
+        const concluidas = row.original.planner_concluidas ?? 0
+        const solicitacaoVerificada = encontradas - concluidas === 0
+
+        if (solicitacaoVerificada) {
+          return (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+              <MonitorCheck className="h-3.5 w-3.5" />
+              Solicitação verificada
+            </span>
+          )
+        }
+
+        return (
+          <div className="flex flex-col gap-1">
+            <span className="inline-flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
+              <CheckCircle2 className="h-3.5 w-3.5 text-blue-400" />
+              {encontradas.toLocaleString('pt-BR')} encontradas
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-300">
+              <MonitorCheck className="h-3.5 w-3.5" />
+              {concluidas.toLocaleString('pt-BR')} concluídas
+            </span>
+          </div>
+        )
+      },
     },
     {
       accessorKey: 'total_nao_atendidas',
@@ -649,7 +744,17 @@ export default function SnowPage() {
     {
       accessorKey: 'status_processamento',
       header: 'Status',
-      cell: ({ row }) => <StatusBadge status={row.original.status_processamento} />,
+      cell: ({ row }) => (
+        <div className="flex flex-col items-start gap-1">
+          <StatusBadge status={row.original.status_processamento} />
+          {row.original.planner_resolvida && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+              <MonitorCheck className="h-3 w-3" />
+              Resolvida
+            </span>
+          )}
+        </div>
+      ),
     },
   ], [])
 
@@ -657,6 +762,57 @@ export default function SnowPage() {
   const taxaEncontradas = totalComDesfecho > 0
     ? Math.round((overview.atendidas / totalComDesfecho) * 100)
     : 0
+  const selectedOperationalItems = selected?.itens.filter(isOperationalItem) ?? []
+  const selectedPlannerConcluidas = selectedOperationalItems.filter(item => item.planner_status === 'concluido').length
+  const selectedPlannerEmAtendimento = selectedOperationalItems.filter(item => item.planner_status === 'assumido').length
+  const selectedPlannerPendentes = selectedOperationalItems.filter(item => (item.planner_status ?? 'pendente') === 'pendente').length
+  const selectedIsResolved = selectedOperationalItems.length > 0 && selectedPlannerConcluidas === selectedOperationalItems.length
+  const activeDateScopeLabel = DATE_SCOPES.find(scope => scope.value === dateScope)?.label ?? dateScope
+  const snowSolicitacoesExportConfig: OverviewExportConfig<SnowSolicitacao> = {
+    title: 'Overview SNOW - Solicitações',
+    filename: 'overview-snow-solicitacoes',
+    rows: exportSolicitacoes.length > 0 ? exportSolicitacoes : data,
+    activeFilters: [{ kind: 'scope', value: dateScope, label: activeDateScopeLabel }],
+    columns: [
+      { key: 'recebida', header: 'Recebida', value: item => formatDateTime(item.recebido_em ?? item.criado_em) },
+      { key: 'arquivo', header: 'Arquivo', value: item => item.nome_arquivo },
+      { key: 'origem', header: 'Origem', value: item => item.origem_email },
+      { key: 'tipo', header: 'Tipo', value: item => TIPO_LABELS[item.tipo_arquivo] ?? item.tipo_arquivo },
+      { key: 'recebidos', header: 'Recebidos', value: item => item.total_recebido },
+      { key: 'encontradas', header: 'Encontradas', value: item => item.total_atendidas },
+      { key: 'fora_inventario', header: 'Fora inventário', value: item => item.total_nao_atendidas },
+      { key: 'quarentena', header: 'Quarentena', value: item => item.total_quarentena },
+      { key: 'inconsistencias', header: 'Inconsistências', value: item => item.total_inconsistentes },
+      { key: 'status', header: 'Status', value: item => STATUS_LABELS[item.status_processamento] ?? item.status_processamento },
+      { key: 'erro', header: 'Erro', value: item => item.erro_processamento },
+    ],
+  }
+  const snowMaquinasExportConfig: OverviewExportConfig<SnowItem> = {
+    title: `Overview SNOW - ${machineFilterLabel(machineFilter)}`,
+    filename: 'overview-snow-maquinas',
+    rows: exportMachineItems.length > 0 ? exportMachineItems : machineItems,
+    activeFilters: [
+      { kind: 'scope', value: dateScope, label: activeDateScopeLabel },
+      { kind: 'machine-filter', value: machineFilter, label: machineFilterLabel(machineFilter) },
+    ],
+    columns: [
+      { key: 'ip', header: 'IP', value: item => item.ip || item.maquina?.endereco_ip },
+      { key: 'hostname', header: 'Hostname', value: item => item.hostname || item.maquina?.nome_host },
+      { key: 'identificador', header: 'Identificador', value: item => item.maquina?.identificador },
+      { key: 'status', header: 'Status SNOW', value: item => STATUS_LABELS[item.status] ?? item.status },
+      { key: 'planner', header: 'Status Planner', value: item => STATUS_LABELS[item.planner_status || 'pendente'] ?? item.planner_status ?? 'Pendente' },
+      { key: 'colaborador', header: 'Colaborador', value: item => item.colaborador_alocado },
+      { key: 'setor', header: 'Setor', value: item => item.setor_alocado },
+      { key: 'localidade', header: 'Localidade', value: item => item.localidade_alocada },
+      { key: 'arquivo', header: 'Arquivo', value: item => item.solicitacao_snow?.nome_arquivo },
+      { key: 'motivo', header: 'Motivo', value: item => item.motivo },
+      { key: 'ultima_revisao', header: 'Última revisão', value: item => item.ultima_revisao },
+      { key: 'bloqueado_ate', header: 'Bloqueado até', value: item => item.bloqueado_ate },
+      { key: 'atendente', header: 'Atendente', value: item => item.atendente_nome },
+      { key: 'concluido_em', header: 'Concluído em', value: item => item.concluido_em },
+    ],
+  }
+  const snowOverviewExportConfig: OverviewExportConfig<any> = viewMode === 'maquinas' ? snowMaquinasExportConfig : snowSolicitacoesExportConfig
 
   return (
     <div className="min-h-screen overflow-x-hidden px-4 py-4 text-slate-100 md:px-6 lg:px-7">
@@ -678,6 +834,7 @@ export default function SnowPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <OverviewExportMenu config={snowOverviewExportConfig} />
               {isAdmin && (
                 <button
                   type="button"
@@ -842,11 +999,11 @@ export default function SnowPage() {
               <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                 {machineItems.map(item => {
                   const isQuarantine = item.status === 'em_quarentena'
-                  const isInconsistent = item.status === 'inconsistente'
+                  const hasOriginInconsistency = isOriginInconsistent(item)
                   return (
                   <motion.button
                     key={item.id}
-                    onClick={() => isQuarantine ? openQuarantineInspect(item) : isInconsistent ? openInconsistentInspect(item) : openMachineInspect(item)}
+                    onClick={() => isQuarantine ? openQuarantineInspect(item) : machineFilter === 'inconsistentes' && hasOriginInconsistency ? openInconsistentInspect(item) : openOperationalInspect(item)}
                     disabled={item.status === 'nao_atendida'}
                     layout
                     whileHover={reduceMotion ? undefined : { y: -2 }}
@@ -854,24 +1011,26 @@ export default function SnowPage() {
                     className={cn(
                       'group flex min-w-0 flex-col rounded-lg border border-slate-100 bg-slate-50 p-4 text-left transition hover:border-blue-300 hover:bg-white dark:border-slate-800 dark:bg-slate-950/60 dark:hover:border-blue-500/60 dark:hover:bg-slate-950',
                       isQuarantine && 'border-amber-300/70 bg-amber-50/70 hover:border-amber-400 dark:border-amber-500/30 dark:bg-amber-500/10 dark:hover:border-amber-400/70',
-                      isInconsistent && 'border-rose-300/70 bg-rose-50/70 hover:border-rose-400 dark:border-rose-500/30 dark:bg-rose-500/10 dark:hover:border-rose-400/70',
+                      machineFilter === 'inconsistentes' && hasOriginInconsistency && 'border-rose-300/70 bg-rose-50/70 hover:border-rose-400 dark:border-rose-500/30 dark:bg-rose-500/10 dark:hover:border-rose-400/70',
                       item.status === 'nao_atendida' && 'cursor-default hover:translate-y-0 hover:border-slate-100 hover:bg-slate-50 dark:hover:border-slate-800 dark:hover:bg-slate-950/60',
                       navigatingItemId === item.id && 'border-blue-400 bg-blue-50 ring-2 ring-blue-500/40 dark:border-blue-500 dark:bg-blue-500/10'
                     )}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
-                        <ItemStatusIcon status={item.status} />
+                        <OperationalStatusIcon item={item} />
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{machineTitle(item)}</p>
-                          <p className="truncate text-xs text-slate-500">{item.ip || item.maquina?.endereco_ip || 'Sem IP'} · {STATUS_LABELS[item.status] ?? item.status}</p>
+                          <p className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-slate-900 dark:text-white">
+                            <span className="truncate">{machineTitle(item)}</span>
+                          </p>
+                          <p className="truncate text-xs text-slate-500">{item.ip || item.maquina?.endereco_ip || 'Sem IP'} · {operationalStatusLabel(item)}</p>
                         </div>
                       </div>
                       {navigatingItemId === item.id ? (
                         <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-400" />
                       ) : isQuarantine ? (
                         <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400 transition group-hover:scale-110" />
-                      ) : isInconsistent ? (
+                      ) : hasOriginInconsistency ? (
                         <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400 transition group-hover:scale-110" />
                       ) : (
                         <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-blue-400" />
@@ -923,10 +1082,15 @@ export default function SnowPage() {
                           </p>
                         </div>
                       )}
-                      {isInconsistent && (
-                        <div className="col-span-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide">Inconsistência SNOW</p>
-                          <p className="mt-0.5 line-clamp-2">{item.motivo || 'IP ou hostname diverge do cadastro oficial.'}</p>
+                      {hasOriginInconsistency && (
+                        <div className="col-span-2 rounded-md border border-rose-200/80 bg-rose-50/60 px-3 py-2 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                          <p className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide">
+                            <AlertTriangle className="h-3 w-3" />
+                            Inconsistente por origem
+                          </p>
+                          {machineFilter === 'inconsistentes' && (
+                            <p className="mt-0.5 line-clamp-2">{item.motivo || 'IP ou hostname diverge do cadastro oficial.'}</p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -960,24 +1124,49 @@ export default function SnowPage() {
               </button>
             </div>
 
-            <div className="grid gap-3 border-b border-slate-100 p-4 text-sm dark:border-slate-800 md:grid-cols-4">
-              <div>
-                <p className="text-xs text-slate-500">Origem</p>
+            <div className="grid gap-4 border-b border-slate-100 p-4 text-sm dark:border-slate-800 lg:grid-cols-[minmax(0,1.15fr)_180px_140px_minmax(360px,1fr)]">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-slate-500">Origem</p>
                 <p className="truncate font-medium text-slate-800 dark:text-slate-100">{selected.origem_email || '-'}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Recebido em</p>
+                <p className="text-xs font-medium text-slate-500">Recebido em</p>
                 <p className="font-medium text-slate-800 dark:text-slate-100">{formatDateTime(selected.recebido_em ?? selected.criado_em)}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Status</p>
+                <p className="text-xs font-medium text-slate-500">Status</p>
                 <StatusBadge status={selected.status_processamento} />
               </div>
-              <div>
-                <p className="text-xs text-slate-500">Totais</p>
-                <p className="font-medium text-slate-800 dark:text-slate-100">
-                  {selected.total_atendidas} encontradas · {selected.total_quarentena} quarentena · {selected.total_inconsistentes} inconsistentes · {selected.total_nao_atendidas} fora
-                </p>
+              <div className="min-w-0 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/50">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-slate-500">Andamento</p>
+                  {selectedIsResolved && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500 px-2 py-0.5 text-[11px] font-semibold text-white">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Resolvida
+                    </span>
+                  )}
+                </div>
+                <div className="grid gap-1.5 sm:grid-cols-3">
+                  <span className="inline-flex min-w-0 items-center justify-center gap-1 rounded-md bg-blue-500/10 px-2 py-1 text-xs font-semibold text-blue-600 dark:text-blue-300">
+                    <Clock3 className="h-3 w-3" />
+                    <span className="truncate">{selectedPlannerPendentes} pendentes</span>
+                  </span>
+                  <span className="inline-flex min-w-0 items-center justify-center gap-1 rounded-md bg-cyan-500/10 px-2 py-1 text-xs font-semibold text-cyan-600 dark:text-cyan-300">
+                    <Laptop className="h-3 w-3" />
+                    <span className="truncate">{selectedPlannerEmAtendimento} em atendimento</span>
+                  </span>
+                  <span className="inline-flex min-w-0 items-center justify-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+                    <MonitorCheck className="h-3 w-3" />
+                    <span className="truncate">{selectedPlannerConcluidas} concluídas</span>
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                  <span>{selected.total_atendidas} encontradas</span>
+                  <span>{selected.total_inconsistentes} inconsistentes</span>
+                  <span>{selected.total_quarentena} quarentena</span>
+                  <span>{selected.total_nao_atendidas} fora</span>
+                </div>
               </div>
             </div>
 
@@ -991,23 +1180,29 @@ export default function SnowPage() {
                 <div className="grid gap-2">
                   {selected.itens.map(item => {
                     const canOpen = Boolean(item.maquina_id && ['atendida', 'em_quarentena', 'inconsistente'].includes(item.status))
+                    const hasOriginInconsistency = isOriginInconsistent(item)
                     return (
                       <button
                         key={item.id}
-                        onClick={() => item.status === 'em_quarentena' ? openQuarantineInspect(item) : item.status === 'inconsistente' ? openInconsistentInspect(item) : openMachineInspect(item)}
+                        onClick={() => item.status === 'em_quarentena' ? openQuarantineInspect(item) : openOperationalInspect(item)}
                         disabled={!canOpen}
                         className={cn(
                           'grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-3 text-left transition dark:border-slate-800 dark:bg-slate-900/70 lg:grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]',
                           canOpen && 'hover:border-blue-300 hover:bg-white dark:hover:border-blue-500/60 dark:hover:bg-slate-900',
                           item.status === 'em_quarentena' && 'border-amber-300/70 bg-amber-50/70 dark:border-amber-500/30 dark:bg-amber-500/10',
-                          item.status === 'inconsistente' && 'border-rose-300/70 bg-rose-50/70 dark:border-rose-500/30 dark:bg-rose-500/10',
+                          hasOriginInconsistency && 'border-rose-300/40 dark:border-rose-500/20',
                           !canOpen && 'cursor-default opacity-80'
                         )}
                       >
-                        <ItemStatusIcon status={item.status} />
+                        <OperationalStatusIcon item={item} />
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{item.hostname || item.maquina?.nome_host || 'Sem hostname'}</p>
-                          <p className="truncate text-xs text-slate-500">{item.ip || item.maquina?.endereco_ip || 'Sem IP'} · {STATUS_LABELS[item.status] ?? item.status}</p>
+                          <p className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-slate-900 dark:text-white">
+                            <span className="truncate">{item.hostname || item.maquina?.nome_host || 'Sem hostname'}</span>
+                            {hasOriginInconsistency && (
+                              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-400" aria-label="Inconsistente por origem SNOW" />
+                            )}
+                          </p>
+                          <p className="truncate text-xs text-slate-500">{item.ip || item.maquina?.endereco_ip || 'Sem IP'} · {operationalStatusLabel(item)}</p>
                         </div>
                         <div className="hidden min-w-0 lg:block">
                           <p className="truncate text-xs text-slate-500">Colaborador</p>
@@ -1018,9 +1213,15 @@ export default function SnowPage() {
                           <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{item.setor_alocado || '-'} · {item.localidade_alocada || '-'}</p>
                         </div>
                         <div className="flex items-center gap-3">
-                          {item.status === 'inconsistente' && (
-                            <span className="hidden max-w-[260px] truncate rounded-md bg-rose-500/10 px-2 py-1 text-xs text-rose-200 sm:inline-block">
-                              {item.motivo || 'IP ou hostname divergente'}
+                          {isOperationalItem(item) && (
+                            <span className={cn('hidden items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold sm:inline-flex', STATUS_TONES[item.planner_status || 'pendente'])}>
+                              {operationalStatusLabel(item)}
+                            </span>
+                          )}
+                          {hasOriginInconsistency && (
+                            <span className="hidden max-w-[220px] items-center gap-1 truncate rounded-md bg-rose-500/10 px-2 py-1 text-xs text-rose-300 sm:inline-flex">
+                              <AlertTriangle className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{item.motivo || 'Inconsistente por origem'}</span>
                             </span>
                           )}
                           {item.status === 'em_quarentena' && (
@@ -1038,6 +1239,137 @@ export default function SnowPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {operationalInspect && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-3" role="dialog" aria-modal="true">
+          <motion.div
+            className="flex w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-blue-300/40 bg-white shadow-2xl dark:border-blue-500/30 dark:bg-slate-950"
+            initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.98 }}
+            animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-blue-200/70 bg-blue-50 p-5 dark:border-blue-500/20 dark:bg-blue-500/10">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <OperationalStatusIcon item={operationalInspect} />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-200">Atendimento SNOW</p>
+                  {isOriginInconsistent(operationalInspect) && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-rose-500/10 px-2 py-0.5 text-xs font-semibold text-rose-600 dark:text-rose-200">
+                      <AlertTriangle className="h-3 w-3" />
+                      Inconsistente por origem
+                    </span>
+                  )}
+                </div>
+                <h2 className="mt-1 truncate text-xl font-bold text-slate-900 dark:text-white">{machineTitle(operationalInspect)}</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  {operationalStatusLabel(operationalInspect)} no fluxo operacional do Planner.
+                </p>
+              </div>
+              <button onClick={() => setOperationalInspect(null)} className="rounded-lg p-2 text-slate-500 hover:bg-white/70 dark:hover:bg-slate-900" aria-label="Fechar atendimento">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-3 border-b border-slate-100 p-4 text-sm dark:border-slate-800 md:grid-cols-3">
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs text-slate-500">Status Planner</p>
+                <div className="mt-1">
+                  <StatusBadge status={operationalInspect.planner_status || 'pendente'} />
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs text-slate-500">Atendente</p>
+                <p className="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{operationalInspect.atendente_nome || '-'}</p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs text-slate-500">{operationalInspect.planner_status === 'concluido' ? 'Concluído em' : 'Assumido em'}</p>
+                <p className="mt-1 font-medium text-slate-800 dark:text-slate-100">
+                  {formatDateTime(operationalInspect.planner_status === 'concluido' ? operationalInspect.concluido_em : operationalInspect.assumido_em)}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 p-4 text-sm md:grid-cols-2">
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Máquina</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-slate-500">Hostname</p>
+                    <p className="truncate font-medium text-slate-800 dark:text-slate-100">{operationalInspect.hostname || operationalInspect.maquina?.nome_host || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">IP</p>
+                    <p className="font-medium text-slate-800 dark:text-slate-100">{operationalInspect.ip || operationalInspect.maquina?.endereco_ip || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Colaborador</p>
+                    <p className="truncate font-medium text-slate-800 dark:text-slate-100">{operationalInspect.colaborador_alocado || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Setor / Localidade</p>
+                    <p className="truncate font-medium text-slate-800 dark:text-slate-100">{operationalInspect.setor_alocado || '-'} · {operationalInspect.localidade_alocada || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Solicitação</p>
+                <p className="mt-3 truncate font-medium text-slate-800 dark:text-slate-100">
+                  {operationalInspect.solicitacao_snow?.nome_arquivo ?? selected?.nome_arquivo ?? 'Solicitação SNOW'}
+                </p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-slate-500">Tipo</p>
+                    <p className="truncate font-medium text-slate-800 dark:text-slate-100">
+                      {TIPO_LABELS[operationalInspect.solicitacao_snow?.tipo_arquivo ?? operationalInspect.tipo_arquivo] ?? operationalInspect.tipo_arquivo}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Recebido em</p>
+                    <p className="font-medium text-slate-800 dark:text-slate-100">
+                      {formatDateTime(operationalInspect.solicitacao_snow?.recebido_em ?? operationalInspect.solicitacao_snow?.criado_em ?? selected?.recebido_em ?? selected?.criado_em ?? operationalInspect.criado_em)}
+                    </p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <p className="text-xs text-slate-500">Origem</p>
+                    <p className="truncate font-medium text-slate-800 dark:text-slate-100">{operationalInspect.solicitacao_snow?.origem_email ?? selected?.origem_email ?? '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 md:col-span-2 sm:flex-row">
+                {operationalInspect.maquina_id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOperationalInspect(null)
+                      openMachineInspect(operationalInspect)
+                    }}
+                    className="flex-1 rounded-lg border border-blue-500/40 bg-slate-950 px-3 py-2 text-left text-blue-100 shadow-sm shadow-blue-950/20 transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-950/40 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-400/60 dark:border-blue-500/40 dark:bg-slate-950 dark:text-blue-100 dark:hover:border-blue-300"
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wide">Inspecionar máquina</span>
+                    <span className="mt-0.5 block text-sm">Abrir o cadastro relacionado no inventário.</span>
+                  </button>
+                )}
+                {(operationalInspect.solicitacao_snow?.id ?? selected?.id) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOperationalInspect(null)
+                      openSnowSolicitationFromInspect(operationalInspect.solicitacao_snow?.id ?? selected!.id, operationalInspect.id)
+                    }}
+                    className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-slate-700 transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-400/40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-blue-500/50 dark:hover:bg-slate-900"
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wide">Abrir solicitação</span>
+                    <span className="mt-0.5 block text-sm">Ver este item no contexto da solicitação SNOW.</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
         </div>
       )}
 

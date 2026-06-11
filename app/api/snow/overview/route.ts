@@ -53,15 +53,17 @@ export async function GET(request: Request) {
       _sum: { total_recebido: true },
     })
 
-    const itemWhere = inicio || fim
-      ? {
-          criado_em: {
-            ...(inicio ? { gte: inicio } : {}),
-            ...(fim ? { lte: fim } : {}),
-          },
-          status: 'atendida',
-        }
-      : { status: 'atendida' }
+    const itemWhere = {
+      ...(inicio || fim
+        ? {
+            criado_em: {
+              ...(inicio ? { gte: inicio } : {}),
+              ...(fim ? { lte: fim } : {}),
+            },
+          }
+        : {}),
+      status: { in: ['atendida', 'inconsistente'] },
+    }
 
     const [plannerPendentes, plannerEmAtendimento, plannerResolvidas] = await Promise.all([
       prisma.solicitacoes_snow_itens.count({

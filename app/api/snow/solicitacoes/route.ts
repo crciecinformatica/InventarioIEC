@@ -63,7 +63,47 @@ export async function GET(request: Request) {
       prisma.solicitacoes_snow.count({ where }),
     ])
 
-    return NextResponse.json({ data, total, page, totalPages: Math.ceil(total / limit) })
+    const ids = data.map(item => item.id)
+    const plannerGroups = ids.length > 0
+      ? await prisma.solicitacoes_snow_itens.groupBy({
+          by: ['solicitacao_snow_id', 'planner_status'],
+          where: {
+            solicitacao_snow_id: { in: ids },
+            status: { in: ['atendida', 'inconsistente'] },
+          },
+          _count: { _all: true },
+        })
+      : []
+    const plannerBySolicitacao = plannerGroups.reduce((map, group) => {
+      const current = map.get(group.solicitacao_snow_id) ?? {
+        planner_pendentes: 0,
+        planner_em_atendimento: 0,
+        planner_concluidas: 0,
+      }
+
+      if (group.planner_status === 'concluido') current.planner_concluidas += group._count._all
+      else if (group.planner_status === 'assumido') current.planner_em_atendimento += group._count._all
+      else current.planner_pendentes += group._count._all
+
+      map.set(group.solicitacao_snow_id, current)
+      return map
+    }, new Map<string, { planner_pendentes: number; planner_em_atendimento: number; planner_concluidas: number }>())
+
+    const enriched = data.map(item => {
+      const counters = plannerBySolicitacao.get(item.id) ?? {
+        planner_pendentes: 0,
+        planner_em_atendimento: 0,
+        planner_concluidas: 0,
+      }
+
+      return {
+        ...item,
+        ...counters,
+        planner_resolvida: counters.planner_pendentes === 0 && counters.planner_em_atendimento === 0 && counters.planner_concluidas > 0,
+      }
+    })
+
+    return NextResponse.json({ data: enriched, total, page, totalPages: Math.ceil(total / limit) })
   } catch (error) {
     console.error('[GET /api/snow/solicitacoes]', error)
     return NextResponse.json({ error: 'Erro interno', data: [], total: 0, page: 1, totalPages: 1 }, { status: 500 })
