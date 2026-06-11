@@ -3,7 +3,7 @@ import { usePermission } from '@/hooks/use-permission'
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Pencil, Trash2, Loader2, UserPlus, ExternalLink, ShieldAlert, CheckCircle2, Clock3, AlertTriangle } from "lucide-react";
+import { X, Pencil, Trash2, Loader2, UserPlus, ExternalLink, ShieldAlert, CheckCircle2, Clock3, AlertTriangle, Laptop } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -46,6 +46,7 @@ type SnowMachineAlert = {
  recebido_em?: string | null
  bloqueado_ate?: string | null
  planner_status?: string | null
+ origin_inconsistent?: boolean | null
  snow_href?: string | null
  solicitacao_id?: string | null
  item_id?: string | null
@@ -127,7 +128,7 @@ export function MaquinaModal({ maquina, onClose, onRefresh }: Props) {
  }
 
  function snowAlertView(alert: SnowMachineAlert) {
-  if (alert.status === 'Inconsistente' || alert.status === 'inconsistente') {
+  if ((alert.status === 'Inconsistente' || alert.status === 'inconsistente') && !alert.origin_inconsistent) {
    return {
     label: 'Solicitação com inconsistência',
     icon: AlertTriangle,
@@ -158,6 +159,17 @@ export function MaquinaModal({ maquina, onClose, onRefresh }: Props) {
     badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-100',
     text: 'text-emerald-700 dark:text-emerald-200',
     button: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+   }
+  }
+  if (alert.planner_status === 'assumido') {
+   return {
+    label: 'Em atendimento',
+    icon: Laptop,
+    frame: 'border-cyan-300/50 bg-cyan-50 text-cyan-950 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-100',
+    iconBox: 'bg-cyan-600 text-white dark:bg-cyan-500/20 dark:text-cyan-100',
+    badge: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-100',
+    text: 'text-cyan-700 dark:text-cyan-200',
+    button: 'bg-cyan-600 hover:bg-cyan-700 text-white',
    }
   }
   return {
@@ -314,6 +326,12 @@ export function MaquinaModal({ maquina, onClose, onRefresh }: Props) {
               <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${snowAlertView(snowAlert).badge}`}>
                {snowAlertView(snowAlert).label}
               </span>
+              {snowAlert.origin_inconsistent && (
+               <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800 dark:bg-rose-400/10 dark:text-rose-100">
+                <AlertTriangle className="h-3 w-3" />
+                Inconsistente por origem
+               </span>
+              )}
              </>
             )}
            </div>

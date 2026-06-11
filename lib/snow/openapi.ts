@@ -161,9 +161,9 @@ export const snowOpenApiSpec = {
     '/api/snow/count': {
       get: {
         tags: ['SNOW - Chamadas internas'],
-        summary: 'Contar solicitações SNOW pendentes',
+        summary: 'Contar solicitações SNOW não concluídas',
         description:
-          'Retorna quantas solicitações SNOW ainda possuem pelo menos uma máquina encontrada sem `planner_status = concluido`. Máquinas em quarentena são apenas controle operacional e não entram no atendimento do Planner.',
+          'Retorna quantas solicitações SNOW ainda possuem diferença entre máquinas encontradas e máquinas concluídas no Planner. Solicitações já verificadas, incluindo casos sem máquinas encontradas, não entram na notificação.',
         security: [{ nextAuthSession: [] }],
         responses: {
           '200': {
