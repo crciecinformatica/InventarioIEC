@@ -13,6 +13,7 @@ import {
   type OverviewFilter,
   notifyOverviewFilter,
 } from "@/components/tables/device-overview-panel";
+import type { OverviewExportConfig } from "@/components/tables/overview-export-menu";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { ForumLinkedIndicator, useForumVinculosResumo } from "@/components/forum/forum-linked-indicator";
@@ -296,6 +297,29 @@ export default function RacksPage() {
           ),
         )
       : null;
+  const overviewPanelData =
+    filteredOverviewData ?? overviewData;
+  const overviewPanelTotal =
+    filteredOverviewData?.length ??
+    (overviewTotal || total);
+  const overviewExportConfig: OverviewExportConfig<Rack> = {
+    title: "Overview de Racks",
+    filename: "overview-racks",
+    rows: overviewPanelData,
+    activeFilters: activeOverviewFilters,
+    columns: [
+      { key: "switch", header: "Switch", value: item => item.nome_switch },
+      { key: "marca", header: "Marca", value: item => item.marca_switch },
+      { key: "patrimonio", header: "Patrimônio", value: item => item.numero_patrimonio },
+      { key: "setor", header: "Setor", value: item => item.setor_nome },
+      { key: "localidade", header: "Localidade", value: item => item.localidade_nome },
+      { key: "localizacao", header: "Localização", value: item => item.localizacao },
+      { key: "portas_total", header: "Portas total", value: item => item.quantidade_portas },
+      { key: "portas_uso", header: "Portas em uso", value: item => item.portas_em_uso },
+      { key: "portas_livres", header: "Portas livres", value: item => item.portas_livres },
+      { key: "ocupacao", header: "Ocupação", value: item => item.quantidade_portas ? `${Math.round(((item.portas_em_uso ?? 0) / item.quantidade_portas) * 100)}%` : null },
+    ],
+  };
 
   const tableData = filteredOverviewData
     ? filteredOverviewData.slice(
@@ -505,10 +529,12 @@ export default function RacksPage() {
       </PageHeader>
 
       <RackOverviewPanel
-        total={overviewTotal || total}
-        items={overviewData}
+        total={overviewPanelTotal}
+        items={overviewPanelData}
+        activeFilters={activeOverviewFilters}
         isLoading={overviewLoading}
         onFilter={applyOverviewFilter}
+        exportConfig={overviewExportConfig}
       />
 
       <DataTable

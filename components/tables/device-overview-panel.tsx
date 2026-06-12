@@ -18,6 +18,7 @@ import { cn, formatDate } from '@/lib/utils'
 import type { AlocacaoAtiva } from '@/types'
 import { ACAO_LABELS, type AuditLog } from '@/lib/audit-constants'
 import { toast } from 'sonner'
+import { OverviewExportMenu, type OverviewExportConfig } from '@/components/tables/overview-export-menu'
 
 export interface DeviceOverviewItem {
   id: string
@@ -104,6 +105,7 @@ interface DeviceOverviewPanelProps<T extends DeviceOverviewItem> {
   activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
 }
 
 interface ImpressoraOverviewPanelProps {
@@ -126,6 +128,7 @@ interface ImpressoraOverviewPanelProps {
   activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
 }
 
 interface RackOverviewPanelProps {
@@ -141,8 +144,10 @@ interface RackOverviewPanelProps {
     portas_livres: number | null
     created_at: string | null
   }>
+  activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
 }
 
 interface ColaboradorOverviewPanelProps {
@@ -173,6 +178,7 @@ interface ColaboradorOverviewPanelProps {
   activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
 }
 
 interface AuditOverviewPanelProps {
@@ -181,6 +187,7 @@ interface AuditOverviewPanelProps {
   activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
 }
 
 type PieChartItem = {
@@ -507,6 +514,7 @@ function OverviewShell({
   beforeContent,
   activeFilters,
   onFilter,
+  exportConfig,
   isLoading = false,
 }: {
   title: string
@@ -524,6 +532,7 @@ function OverviewShell({
   beforeContent?: ReactNode
   activeFilters?: ActiveOverviewFilterState[]
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
   isLoading?: boolean
 }) {
   const sections: OverviewListSection[] = listSections ?? [{
@@ -541,9 +550,12 @@ function OverviewShell({
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Overview geral</p>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
         </div>
-        <span className={cn('flex h-9 w-9 items-center justify-center rounded-lg text-white', accentClassName)}>
-          {icon}
-        </span>
+        <div className="flex items-center gap-2">
+          {exportConfig && <OverviewExportMenu config={exportConfig} />}
+          <span className={cn('flex h-9 w-9 items-center justify-center rounded-lg text-white', accentClassName)}>
+            {icon}
+          </span>
+        </div>
       </div>
 
       {isLoading ? (
@@ -714,6 +726,7 @@ export function DeviceOverviewPanel<T extends DeviceOverviewItem>({
   activeFilters = [],
   isLoading = false,
   onFilter,
+  exportConfig,
 }: DeviceOverviewPanelProps<T>) {
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
   const locations = buildLocationScopes(items)
@@ -784,9 +797,12 @@ export function DeviceOverviewPanel<T extends DeviceOverviewItem>({
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Overview geral</p>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
         </div>
-        <span className={cn('flex h-9 w-9 items-center justify-center rounded-lg text-white', accentClassName)}>
-          <Activity className="h-4 w-4" />
-        </span>
+        <div className="flex items-center gap-2">
+          {exportConfig && <OverviewExportMenu config={exportConfig} />}
+          <span className={cn('flex h-9 w-9 items-center justify-center rounded-lg text-white', accentClassName)}>
+            <Activity className="h-4 w-4" />
+          </span>
+        </div>
       </div>
 
       {isLoading ? (
@@ -999,6 +1015,7 @@ export function ImpressoraOverviewPanel({
   activeFilters = [],
   isLoading = false,
   onFilter,
+  exportConfig,
 }: ImpressoraOverviewPanelProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
   const locations = buildLocationScopes(items)
@@ -1083,12 +1100,13 @@ export function ImpressoraOverviewPanel({
       ]}
       activeFilters={activeFilters}
       onFilter={onFilter}
+      exportConfig={exportConfig}
       isLoading={isLoading}
     />
   )
 }
 
-export function RackOverviewPanel({ total, items, isLoading = false, onFilter }: RackOverviewPanelProps) {
+export function RackOverviewPanel({ total, items, activeFilters = [], isLoading = false, onFilter, exportConfig }: RackOverviewPanelProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
   const locationScopes = buildLocationScopes(items)
   const scopedItems = filterByLocation(items, selectedLocationId)
@@ -1165,7 +1183,9 @@ export function RackOverviewPanel({ total, items, isLoading = false, onFilter }:
           emptyMessage: 'Nenhum rack proximo da ocupacao maxima.',
         },
       ]}
+      activeFilters={activeFilters}
       onFilter={onFilter}
+      exportConfig={exportConfig}
       isLoading={isLoading}
     />
   )
@@ -1179,6 +1199,7 @@ export function ColaboradorOverviewPanel({
   activeFilters = [],
   isLoading = false,
   onFilter,
+  exportConfig,
 }: ColaboradorOverviewPanelProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
   const locations = buildLocationScopes(items)
@@ -1249,6 +1270,7 @@ export function ColaboradorOverviewPanel({
       ]}
       activeFilters={activeFilters}
       onFilter={onFilter}
+      exportConfig={exportConfig}
       isLoading={isLoading}
     />
   )
@@ -1302,7 +1324,7 @@ export function notifyOverviewFilter(filters: ActiveOverviewFilterState[]) {
   ), { id: toastId })
 }
 
-export function AuditOverviewPanel({ total, items, activeFilters, isLoading = false, onFilter }: AuditOverviewPanelProps) {
+export function AuditOverviewPanel({ total, items, activeFilters, isLoading = false, onFilter, exportConfig }: AuditOverviewPanelProps) {
   const scopedItems = items
   const analyzedTotal = scopedItems.length
   const displayedTotal = total || analyzedTotal
@@ -1393,6 +1415,7 @@ export function AuditOverviewPanel({ total, items, activeFilters, isLoading = fa
       ]}
       onFilter={onFilter}
       activeFilters={activeFilters}
+      exportConfig={exportConfig}
       isLoading={isLoading}
     />
   )

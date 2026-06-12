@@ -25,6 +25,7 @@ import {
 import { toast } from 'sonner'
 import { usePermission } from '@/hooks/use-permission'
 import { AnimatedSheetFrame } from '@/components/layout/motion-primitives'
+import { OverviewExportMenu, type OverviewExportConfig } from '@/components/tables/overview-export-menu'
 import { cn } from '@/lib/utils'
 import {
   buildHref,
@@ -611,25 +612,6 @@ export default function PedidosPage() {
     if (match) setSelected(match)
   }, [inspectId, pedidos])
 
-  const overview = useMemo(() => {
-    const byStatus = {
-      pendente: pedidos.filter(pedido => pedido.status === 'pendente').length,
-      aprovada: pedidos.filter(pedido => pedido.status === 'aprovada').length,
-      recusada: pedidos.filter(pedido => pedido.status === 'recusada').length,
-    }
-    const byKind = {
-      inventario: pedidos.filter(pedido => pedidoKind(pedido) === 'inventario').length,
-      upload: pedidos.filter(pedido => pedidoKind(pedido) === 'upload').length,
-    }
-    const byAction = Object.keys(ACTION_LABELS).map(action => ({
-      action,
-      label: ACTION_LABELS[action],
-      count: pedidos.filter(pedido => pedido.acao === action).length,
-    }))
-
-    return { byStatus, byKind, byAction }
-  }, [pedidos])
-
   const filtered = useMemo(() => {
     return pedidos.filter(pedido => {
       if (statusFilter && pedido.status !== statusFilter) return false
@@ -638,6 +620,49 @@ export default function PedidosPage() {
       return true
     })
   }, [pedidos, statusFilter, kindFilter, actionFilter])
+
+  const overview = useMemo(() => {
+    const overviewItems = statusFilter || kindFilter || actionFilter ? filtered : pedidos
+    const byStatus = {
+      pendente: overviewItems.filter(pedido => pedido.status === 'pendente').length,
+      aprovada: overviewItems.filter(pedido => pedido.status === 'aprovada').length,
+      recusada: overviewItems.filter(pedido => pedido.status === 'recusada').length,
+    }
+    const byKind = {
+      inventario: overviewItems.filter(pedido => pedidoKind(pedido) === 'inventario').length,
+      upload: overviewItems.filter(pedido => pedidoKind(pedido) === 'upload').length,
+    }
+    const byAction = Object.keys(ACTION_LABELS).map(action => ({
+      action,
+      label: ACTION_LABELS[action],
+      count: overviewItems.filter(pedido => pedido.acao === action).length,
+    }))
+
+    return { byStatus, byKind, byAction }
+  }, [pedidos, filtered, statusFilter, kindFilter, actionFilter])
+  const pedidoOverviewFilters = [
+    statusFilter ? { kind: 'status', value: statusFilter, label: STATUS_META[statusFilter].label } : null,
+    kindFilter ? { kind: 'tipo', value: kindFilter, label: KIND_META[kindFilter].label } : null,
+    actionFilter ? { kind: 'acao', value: actionFilter, label: ACTION_LABELS[actionFilter] ?? actionFilter } : null,
+  ].filter((filter): filter is { kind: string; value: string; label: string } => Boolean(filter))
+  const overviewExportConfig: OverviewExportConfig<Pedido> = {
+    title: 'Overview de Pedidos',
+    filename: 'overview-pedidos',
+    rows: filtered,
+    activeFilters: pedidoOverviewFilters,
+    columns: [
+      { key: 'created_at', header: 'Criado em', value: pedido => pedido.created_at ? new Date(pedido.created_at).toLocaleString('pt-BR') : null },
+      { key: 'tipo', header: 'Tipo', value: pedido => KIND_META[pedidoKind(pedido)].label },
+      { key: 'acao', header: 'Ação', value: pedido => ACTION_LABELS[pedido.acao] ?? pedido.acao },
+      { key: 'status', header: 'Status', value: pedido => STATUS_META[pedido.status].label },
+      { key: 'recurso', header: 'Recurso', value: pedido => RESOURCE_LABELS[pedido.tipo_recurso] ?? pedido.tipo_recurso },
+      { key: 'solicitante', header: 'Solicitante', value: pedido => pedido.solicitante_nome },
+      { key: 'revisor', header: 'Revisor', value: pedido => pedido.revisor_nome },
+      { key: 'revisado_em', header: 'Revisado em', value: pedido => pedido.revisado_em ? new Date(pedido.revisado_em).toLocaleString('pt-BR') : null },
+      { key: 'parecer', header: 'Parecer', value: pedido => pedido.parecer },
+      { key: 'erro', header: 'Erro de aplicação', value: pedido => pedido.erro_aplicacao },
+    ],
+  }
   const selectedContextRows = selected ? buildContextRows(selected) : []
   const selectedTarget = selected ? getPedidoInspectTarget(selected) : null
   const selectedArquivo = selected ? getPedidoArquivoInfo(selected) : null
@@ -697,6 +722,8 @@ export default function PedidosPage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Overview</p>
             <h2 className="text-base font-semibold text-white">Fila de pedidos</h2>
           </div>
+          <div className="flex items-center gap-2">
+          <OverviewExportMenu config={overviewExportConfig} />
           {(statusFilter || kindFilter || actionFilter) && (
             <button
               type="button"
@@ -711,6 +738,7 @@ export default function PedidosPage() {
               Limpar seleção
             </button>
           )}
+          </div>
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,0.65fr)_minmax(0,1.35fr)]">

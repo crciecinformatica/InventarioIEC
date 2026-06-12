@@ -10,6 +10,7 @@ import {
   type OverviewFilter,
   notifyOverviewFilter,
 } from "@/components/tables/device-overview-panel";
+import type { OverviewExportConfig } from "@/components/tables/overview-export-menu";
 import { PageHeader } from "@/components/layout/page-header";
 import { BoolBadge } from "@/components/dashboard/status-badge";
 import { ForumLinkedIndicator, useForumVinculosResumo } from "@/components/forum/forum-linked-indicator";
@@ -329,6 +330,29 @@ export default function AparelhosPage() {
           ),
         )
       : null;
+  const overviewPanelData =
+    filteredOverviewData ?? overviewData;
+  const overviewPanelTotal =
+    filteredOverviewData?.length ??
+    (overviewTotal || total);
+  const overviewExportConfig: OverviewExportConfig<Aparelho> = {
+    title: "Overview de Aparelhos",
+    filename: "overview-aparelhos",
+    rows: overviewPanelData,
+    activeFilters: activeOverviewFilters,
+    columns: [
+      { key: "modelo", header: "Modelo", value: item => item.modelo },
+      { key: "tipo", header: "Tipo", value: item => item.tipo },
+      { key: "ip", header: "IP", value: item => item.endereco_ip },
+      { key: "mac", header: "MAC", value: item => item.endereco_mac },
+      { key: "setor", header: "Setor", value: item => getAparelhoSetor(item) },
+      { key: "localidade", header: "Localidade", value: item => item.localidade_nome },
+      { key: "uso", header: "Uso", value: item => isAllocated(item) ? "Ocupado" : "Livre" },
+      { key: "chip", header: "Com chip", value: item => item.chip === true },
+      { key: "status", header: "Ativo", value: item => item.status !== false },
+      { key: "colaboradores", header: "Colaboradores", value: item => (item.alocacoes_ativas ?? []).map(alocacao => alocacao.colaborador.nome).join(", ") },
+    ],
+  };
 
   const tableData = filteredOverviewData
     ? filteredOverviewData.slice(
@@ -725,12 +749,13 @@ export default function AparelhosPage() {
 
       <DeviceOverviewPanel
         title="Aparelhos"
-        total={overviewTotal || total}
-        items={overviewData}
+        total={overviewPanelTotal}
+        items={overviewPanelData}
         accentClassName="bg-cyan-500"
         activeFilters={activeOverviewFilters}
         isLoading={overviewLoading}
         onFilter={applyOverviewFilter}
+        exportConfig={overviewExportConfig}
       />
 
       <DataTable

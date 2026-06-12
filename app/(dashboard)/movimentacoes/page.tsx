@@ -9,6 +9,7 @@ import {
   notifyOverviewFilter,
   type OverviewFilter,
 } from '@/components/tables/device-overview-panel'
+import type { OverviewExportConfig } from '@/components/tables/overview-export-menu'
 import { PageHeader } from '@/components/layout/page-header'
 import { AuditLogModal } from '@/components/modals/audit-log-modal'
 import { useFetchData } from '@/hooks/use-fetch-data'
@@ -60,6 +61,13 @@ export default function MovimentacoesPage() {
   const filteredOverviewData = activeOverviewFilter
     ? overviewData.filter(activeOverviewFilter.predicate)
     : null
+  const urlAuditUserOverviewData = !activeOverviewFilter && (usuarioId || usuarioLabel)
+    ? overviewData.filter(item =>
+        usuarioId
+          ? item.usuario_id === usuarioId
+          : (item.usuario_nome || 'Sem responsavel') === usuarioLabel
+      )
+    : null
   const urlAuditUserFilter = usuarioLabel
     ? {
         kind: 'audit-user',
@@ -75,6 +83,21 @@ export default function MovimentacoesPage() {
   const tableData = filteredOverviewData
     ? filteredOverviewData.slice((page - 1) * 20, page * 20)
     : data
+  const overviewPanelData = filteredOverviewData ?? urlAuditUserOverviewData ?? overviewData
+  const overviewPanelTotal = filteredOverviewData?.length ?? urlAuditUserOverviewData?.length ?? (overviewTotal || total)
+  const overviewExportConfig: OverviewExportConfig<AuditLog> = {
+    title: 'Overview de Auditoria',
+    filename: 'overview-auditoria',
+    rows: overviewPanelData,
+    activeFilters: auditOverviewActiveFilters,
+    columns: [
+      { key: 'data', header: 'Data/Hora', value: item => item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : null },
+      { key: 'acao', header: 'Ação', value: item => ACAO_LABELS[item.acao] || item.acao },
+      { key: 'modulo', header: 'Módulo', value: item => TABELAS_OPCOES.find(t => t.value === item.tabela)?.label || item.tabela },
+      { key: 'descricao', header: 'Descrição', value: item => item.descricao },
+      { key: 'responsavel', header: 'Responsável', value: item => item.usuario_nome },
+    ],
+  }
   const tableTotal = filteredOverviewData?.length ?? total
   const tableTotalPages = filteredOverviewData ? Math.max(1, Math.ceil(filteredOverviewData.length / 20)) : totalPages
 
@@ -382,11 +405,12 @@ export default function MovimentacoesPage() {
       />
 
       <AuditOverviewPanel
-        total={overviewTotal || total}
-        items={overviewData}
+        total={overviewPanelTotal}
+        items={overviewPanelData}
         activeFilters={auditOverviewActiveFilters}
         isLoading={overviewLoading}
         onFilter={applyOverviewFilter}
+        exportConfig={overviewExportConfig}
       />
 
       <DataTable

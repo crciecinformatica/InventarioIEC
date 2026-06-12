@@ -31,12 +31,45 @@ function slugify(value: string) {
 function formatCell(value: string | number | boolean | null | undefined) {
   if (value === null || value === undefined || value === '') return ''
   if (typeof value === 'boolean') return value ? 'Sim' : 'Nao'
+  if (typeof value === 'string' && isGuid(value)) return ''
   return value
 }
 
-function buildExportRows<T>(config: OverviewExportConfig<T>) {
+function isGuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim())
+}
+
+function isInternalColumn(column: OverviewExportColumn<unknown>) {
+  const key = column.key
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+  const header = column.header
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+  if (key === 'id' || key.endsWith('_id') || key.endsWith('-id')) return true
+  if (key.includes('guid') || key.includes('uuid')) return true
+  if (header === 'id' || header.includes('guid') || header.includes('uuid')) return true
+  return false
+}
+
+function isGuidOnlyColumn<T>(config: OverviewExportConfig<T>, column: OverviewExportColumn<T>) {
+  const values = config.rows
+    .map(row => column.value(row))
+    .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+
+  return values.length > 0 && values.every(isGuid)
+}
+
+function getExportColumns<T>(config: OverviewExportConfig<T>) {
+  return config.columns.filter(column => !isInternalColumn(column as OverviewExportColumn<unknown>) && !isGuidOnlyColumn(config, column))
+}
+
+function buildExportRows<T>(config: OverviewExportConfig<T>, columns = getExportColumns(config)) {
   return config.rows.map(row => {
-    return config.columns.reduce<OverviewPdfRow>((record, column) => {
+    return columns.reduce<OverviewPdfRow>((record, column) => {
       record[column.key] = formatCell(column.value(row))
       return record
     }, {})
@@ -69,19 +102,20 @@ export function OverviewExportMenu<T>({ config }: { config: OverviewExportConfig
     setOpen(false)
     try {
       const XLSX = await import('xlsx')
-      const rows = buildExportRows(config)
+      const columns = getExportColumns(config)
+      const rows = buildExportRows(config, columns)
       const sheet = XLSX.utils.json_to_sheet(rows, {
-        header: config.columns.map(column => column.key),
+        header: columns.map(column => column.key),
       })
 
-      XLSX.utils.sheet_add_aoa(sheet, [config.columns.map(column => column.header)], { origin: 'A1' })
-      sheet['!cols'] = config.columns.map(column => ({
+      XLSX.utils.sheet_add_aoa(sheet, [columns.map(column => column.header)], { origin: 'A1' })
+      sheet['!cols'] = columns.map(column => ({
         wch: Math.max(14, Math.min(36, column.header.length + 8)),
       }))
       sheet['!autofilter'] = {
         ref: XLSX.utils.encode_range({
           s: { c: 0, r: 0 },
-          e: { c: Math.max(0, config.columns.length - 1), r: Math.max(0, rows.length) },
+          e: { c: Math.max(0, columns.length - 1), r: Math.max(0, rows.length) },
         }),
       }
 
@@ -110,8 +144,9 @@ export function OverviewExportMenu<T>({ config }: { config: OverviewExportConfig
         import('@react-pdf/renderer'),
         import('@/components/tables/overview-export-pdf'),
       ])
-      const rows = buildExportRows(config)
-      const columns: OverviewPdfColumn[] = config.columns.map(column => ({
+      const exportColumns = getExportColumns(config)
+      const rows = buildExportRows(config, exportColumns)
+      const columns: OverviewPdfColumn[] = exportColumns.map(column => ({
         key: column.key,
         header: column.header,
       }))

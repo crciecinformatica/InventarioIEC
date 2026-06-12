@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/tables/data-table'
 import { DeviceOverviewPanel, type OverviewFilter, notifyOverviewFilter } from '@/components/tables/device-overview-panel'
+import type { OverviewExportConfig } from '@/components/tables/overview-export-menu'
 import { PageHeader } from '@/components/layout/page-header'
 import { BoolBadge } from '@/components/dashboard/status-badge'
 import { ForumLinkedIndicator, useForumVinculosResumo } from '@/components/forum/forum-linked-indicator'
@@ -87,7 +88,7 @@ export default function RamaisPage() {
   const [overviewFilterLoading, setOverviewFilterLoading] = useState(false)
 
   const [search, setSearch] = useState('')
-  const [disponibilidade, setDisponibilidade] = useState('')
+  const [disponibilidade] = useState('')
   const [setorIdFiltro, setSetorIdFiltro] = useState<string | null>(searchParams.get('setor_id'))
   const [localidadeIdFiltro, setLocalidadeIdFiltro] = useState<string | null>(searchParams.get('localidade_id'))
   const [fila, setFila] = useState('')
@@ -251,6 +252,26 @@ export default function RamaisPage() {
   const filteredOverviewData = activeOverviewFilters.length > 0
     ? overviewData.filter(item => matchesOverviewFilters(item, activeOverviewFilters))
     : null
+  const overviewPanelData = filteredOverviewData ?? overviewData
+  const overviewPanelTotal = filteredOverviewData?.length ?? (overviewTotal || total)
+  const overviewExportConfig: OverviewExportConfig<Ramal> = {
+    title: 'Overview de Ramais',
+    filename: 'overview-ramais',
+    rows: overviewPanelData,
+    activeFilters: activeOverviewFilters,
+    columns: [
+      { key: 'numero', header: 'Ramal', value: item => item.numero_ramal },
+      { key: 'prefixo', header: 'Prefixo', value: item => item.prefixo_telefonico },
+      { key: 'setor', header: 'Setor', value: item => getRamalSetor(item) },
+      { key: 'localidade', header: 'Localidade', value: item => item.localidade_nome },
+      { key: 'uso', header: 'Uso', value: item => isAllocated(item) ? 'Ocupado' : 'Livre' },
+      { key: 'whatsapp', header: 'WhatsApp', value: item => hasWhatsapp(item) },
+      { key: 'fila', header: 'Fila', value: item => item.fila === true },
+      { key: 'disponibilidade', header: 'Disponibilidade', value: item => item.disponibilidade },
+      { key: 'colaboradores', header: 'Colaboradores', value: item => (item.alocacoes_ativas ?? []).map(alocacao => alocacao.colaborador.nome).join(', ') },
+      { key: 'ultima_revisao', header: 'Última revisão', value: item => item.ultima_revisao },
+    ],
+  }
   const tableData = filteredOverviewData
     ? filteredOverviewData.slice((page - 1) * 20, page * 20)
     : data
@@ -442,12 +463,13 @@ export default function RamaisPage() {
 
       <DeviceOverviewPanel
         title="Ramais"
-        total={overviewTotal || total}
-        items={overviewData}
+        total={overviewPanelTotal}
+        items={overviewPanelData}
         accentClassName="bg-emerald-500"
         activeFilters={activeOverviewFilters}
         isLoading={overviewLoading}
         onFilter={applyOverviewFilter}
+        exportConfig={overviewExportConfig}
       />
 
       <DataTable

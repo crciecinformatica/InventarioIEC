@@ -6,6 +6,7 @@ import { AnimatePresence } from 'motion/react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/tables/data-table'
 import { DeviceOverviewPanel, type OverviewFilter, notifyOverviewFilter } from '@/components/tables/device-overview-panel'
+import type { OverviewExportConfig } from '@/components/tables/overview-export-menu'
 import { PageHeader } from '@/components/layout/page-header'
 import { CategoriaBadge } from '@/components/dashboard/status-badge'
 import { ForumLinkedIndicator, useForumVinculosResumo } from '@/components/forum/forum-linked-indicator'
@@ -157,6 +158,29 @@ export default function MaquinasPage() {
   const filteredOverviewData = activeOverviewFilters.length > 0
     ? overviewData.filter(item => matchesOverviewFilters(item, activeOverviewFilters))
     : null
+  const overviewPanelData = filteredOverviewData ?? overviewData
+  const overviewPanelTotal = filteredOverviewData?.length ?? (overviewTotal || total)
+  const overviewExportConfig: OverviewExportConfig<Maquina> = {
+    title: 'Overview de Máquinas',
+    filename: 'overview-maquinas',
+    rows: overviewPanelData,
+    activeFilters: activeOverviewFilters,
+    columns: [
+      { key: 'endereco_ip', header: 'IP', value: item => item.endereco_ip },
+      { key: 'nome_host', header: 'Host', value: item => item.nome_host },
+      { key: 'identificador', header: 'Identificador', value: item => item.identificador },
+      { key: 'modelo', header: 'Modelo', value: item => item.modelo },
+      { key: 'fabricante', header: 'Fabricante', value: item => item.fabricante },
+      { key: 'categoria', header: 'Categoria', value: item => item.categoria },
+      { key: 'setor', header: 'Setor', value: item => getMaquinaSetor(item) },
+      { key: 'localidade', header: 'Localidade', value: item => item.localidade_nome },
+      { key: 'uso', header: 'Uso', value: item => isAllocated(item) ? 'Ocupada' : 'Livre' },
+      { key: 'colaboradores', header: 'Colaboradores', value: item => (item.alocacoes_ativas ?? []).map(alocacao => alocacao.colaborador.nome).join(', ') },
+      { key: 'patrimonio_cpu', header: 'Patrimônio CPU', value: item => item.patrimonio_cpu },
+      { key: 'patrimonio_monitor', header: 'Patrimônio Monitor', value: item => item.patrimonio_monitor },
+      { key: 'data_revisao', header: 'Última revisão', value: item => item.data_revisao },
+    ],
+  }
   const tableData = filteredOverviewData
     ? filteredOverviewData.slice((page - 1) * 20, page * 20)
     : data
@@ -413,12 +437,13 @@ export default function MaquinasPage() {
 
       <DeviceOverviewPanel
         title="Máquinas"
-        total={overviewTotal || total}
-        items={overviewData}
+        total={overviewPanelTotal}
+        items={overviewPanelData}
         accentClassName="bg-blue-500"
         activeFilters={activeOverviewFilters}
         isLoading={overviewLoading}
         onFilter={applyOverviewFilter}
+        exportConfig={overviewExportConfig}
       />
 
       <DataTable
