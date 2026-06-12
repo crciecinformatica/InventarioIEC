@@ -13,6 +13,7 @@ import {
   type OverviewFilter,
   notifyOverviewFilter,
 } from "@/components/tables/device-overview-panel";
+import type { OverviewExportConfig } from "@/components/tables/overview-export-menu";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { CategoriaBadge } from "@/components/dashboard/status-badge";
@@ -44,6 +45,30 @@ function isAllocated(item: Notebook) {
 
 function isOccupied(item: Notebook) {
   return isAllocated(item) || item.emprestado === true;
+}
+
+function allocationNames(item: Notebook) {
+  const allocated = (item.alocacoes_ativas ?? [])
+    .map(alocacao => alocacao.colaborador.nome)
+    .filter(Boolean)
+    .join(", ");
+  return item.emprestado_colaborador_nome || allocated || item.alocacao_ativa?.colaborador.nome || "Livre";
+}
+
+function allocationDetails(item: Notebook) {
+  const details = (item.alocacoes_ativas ?? [])
+    .map(alocacao => {
+      const setor = alocacao.colaborador.setor_rel?.nome;
+      const desde = alocacao.data_inicio ? `desde ${alocacao.data_inicio}` : null;
+      return [alocacao.colaborador.nome, setor, desde].filter(Boolean).join(" · ");
+    })
+    .join("; ");
+
+  if (item.emprestado_colaborador_nome) {
+    return [item.emprestado_colaborador_nome, item.emprestado_colaborador_setor, item.emprestado_desde ? `emprestado desde ${item.emprestado_desde}` : null, item.emprestado_obs].filter(Boolean).join(" · ");
+  }
+
+  return details || allocationNames(item);
 }
 
 function hasMissingNotebookData(item: Notebook) {
@@ -233,6 +258,42 @@ export default function NotebooksPage() {
           matchesOverviewFilters(item, activeOverviewFilters),
         )
       : null;
+  const overviewPanelData = filteredOverviewData ?? overviewData;
+  const overviewPanelTotal =
+    filteredOverviewData?.length ?? (overviewTotal || total);
+  const overviewExportConfig: OverviewExportConfig<Notebook> = {
+    title: "Overview de Notebooks",
+    filename: "overview-notebooks",
+    rows: overviewPanelData,
+    activeFilters: activeOverviewFilters,
+    columns: [
+      { key: "modelo", header: "Modelo", value: item => item.modelo },
+      { key: "fabricante", header: "Fabricante", value: item => item.fabricante },
+      { key: "patrimonio", header: "Patrimônio", value: item => item.numero_patrimonio },
+      { key: "categoria", header: "Categoria", value: item => item.categoria },
+      { key: "setor", header: "Setor", value: item => getNotebookSetor(item) },
+      { key: "localidade", header: "Localidade", value: item => item.localidade_nome },
+      { key: "uso", header: "Uso", value: item => isOccupied(item) ? "Ocupado" : "Livre" },
+      { key: "alocado", header: "Alocado", value: item => isAllocated(item) },
+      { key: "emprestado", header: "Emprestado", value: item => item.emprestado },
+      { key: "colaborador", header: "Colaborador/Empréstimo", value: item => allocationNames(item) },
+      { key: "relacao_alocacao", header: "Relação de alocação", value: item => allocationDetails(item) },
+      { key: "processador", header: "Processador", value: item => item.processador },
+      { key: "memoria", header: "Memória", value: item => item.memoria },
+      { key: "armazenamento", header: "Armazenamento", value: item => item.armazenamento },
+      { key: "data_revisao", header: "Última revisão", value: item => item.data_revisao },
+    ],
+    pdfColumns: [
+      { key: "patrimonio", header: "Patrimônio", value: item => item.numero_patrimonio },
+      { key: "modelo", header: "Modelo", value: item => item.modelo },
+      { key: "fabricante", header: "Fabricante", value: item => item.fabricante },
+      { key: "setor", header: "Setor", value: item => getNotebookSetor(item) },
+      { key: "localidade", header: "Localidade", value: item => item.localidade_nome },
+      { key: "colaborador", header: "Colaborador alocado", value: item => allocationNames(item) },
+      { key: "categoria", header: "Categoria", value: item => item.categoria },
+      { key: "data_revisao", header: "Última revisão", value: item => item.data_revisao },
+    ],
+  };
 
   const tableData = filteredOverviewData
     ? filteredOverviewData.slice(
@@ -774,14 +835,15 @@ export default function NotebooksPage() {
 
       <DeviceOverviewPanel
         title="Notebooks"
-        total={overviewTotal || total}
-        items={overviewData}
+        total={overviewPanelTotal}
+        items={overviewPanelData}
         accentClassName="bg-violet-500"
         activeFilters={
           activeOverviewFilters
         }
         isLoading={overviewLoading}
         onFilter={applyOverviewFilter}
+        exportConfig={overviewExportConfig}
       />
 
       <DataTable

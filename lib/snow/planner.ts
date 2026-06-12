@@ -8,6 +8,10 @@ export type SnowPlannerPayload = {
   assumido_em?: unknown
   concluido_em?: unknown
   observacao?: unknown
+  csc_numero?: unknown
+  numero_csc?: unknown
+  csc_criado_em?: unknown
+  criado_em_csc?: unknown
 }
 
 function requiredText(value: unknown, field: string) {
@@ -19,6 +23,12 @@ function requiredText(value: unknown, field: string) {
 function optionalText(value: unknown) {
   const text = String(value ?? '').trim()
   return text || null
+}
+
+function requiredDate(value: unknown, field: string) {
+  const date = parseOptionalDate(value)
+  if (!date) throw new SnowProcessingError(`Campo inválido ou obrigatório: ${field}`, 400)
+  return date
 }
 
 export function parseAssumirPayload(payload: SnowPlannerPayload) {
@@ -37,5 +47,12 @@ export function parseConcluirPayload(payload: SnowPlannerPayload) {
     plannerTaskId: optionalText(payload.planner_task_id),
     concluidoEm: parseOptionalDate(payload.concluido_em),
     observacao: optionalText(payload.observacao),
+  }
+}
+
+export function parseCscPayload(payload: SnowPlannerPayload) {
+  return {
+    cscNumero: requiredText(payload.csc_numero ?? payload.numero_csc, 'csc_numero'),
+    cscCriadoEm: requiredDate(payload.csc_criado_em ?? payload.criado_em_csc, 'csc_criado_em'),
   }
 }

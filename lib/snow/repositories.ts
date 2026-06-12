@@ -240,3 +240,38 @@ export async function markSnowItemCompleted(params: {
   if (!rows[0]) throw new SnowProcessingError('Item SNOW não encontrado', 404)
   return rows[0]
 }
+
+export async function registerSnowItemCsc(params: {
+  id: string
+  cscNumero: string
+  cscCriadoEm: Date
+}) {
+  const now = new Date()
+
+  const rows = await prisma.$queryRaw<Array<{
+    id: string
+    csc_numero: string | null
+    csc_criado_em: Date | null
+    csc_atualizado_em: Date | null
+    planner_status: string
+    planner_task_id: string | null
+    planner_atualizado_em: Date | null
+  }>>`
+    UPDATE solicitacoes_snow_itens
+       SET csc_numero = ${params.cscNumero},
+           csc_criado_em = ${params.cscCriadoEm},
+           csc_atualizado_em = ${now},
+           planner_atualizado_em = ${now}
+     WHERE id = ${params.id}::uuid
+     RETURNING id,
+               csc_numero,
+               csc_criado_em,
+               csc_atualizado_em,
+               planner_status,
+               planner_task_id,
+               planner_atualizado_em
+  `
+
+  if (!rows[0]) throw new SnowProcessingError('Item SNOW não encontrado', 404)
+  return rows[0]
+}

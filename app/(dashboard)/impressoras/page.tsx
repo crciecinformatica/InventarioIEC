@@ -11,6 +11,7 @@ import {
   type OverviewFilter,
   notifyOverviewFilter,
 } from "@/components/tables/device-overview-panel";
+import type { OverviewExportConfig } from "@/components/tables/overview-export-menu";
 import { PageHeader } from "@/components/layout/page-header";
 import { BoolBadge } from "@/components/dashboard/status-badge";
 import { ForumLinkedIndicator, useForumVinculosResumo } from "@/components/forum/forum-linked-indicator";
@@ -163,6 +164,28 @@ export default function ImpressorasPage() {
           matchesOverviewFilters(item, activeOverviewFilters)
         )
       : null;
+  const overviewPanelData = filteredOverviewData ?? overviewData;
+  const overviewPanelTotal =
+    filteredOverviewData?.length ?? (overviewTotal || total);
+  const overviewExportConfig: OverviewExportConfig<Impressora> = {
+    title: "Overview de Impressoras",
+    filename: "overview-impressoras",
+    rows: overviewPanelData,
+    activeFilters: activeOverviewFilters,
+    columns: [
+      { key: "host", header: "Host", value: item => item.nome_host },
+      { key: "fabricante", header: "Fabricante", value: item => item.fabricante },
+      { key: "modelo", header: "Modelo", value: item => item.modelo },
+      { key: "serie", header: "Nº Série", value: item => item.numero_serie },
+      { key: "selb", header: "SELB", value: item => item.identificador_selb },
+      { key: "ip", header: "IP", value: item => item.endereco_ip },
+      { key: "setor", header: "Setor", value: item => item.setor_nome || "Sem setor registrado" },
+      { key: "localidade", header: "Localidade", value: item => item.localidade_nome ?? item.localidade },
+      { key: "andar", header: "Andar", value: item => item.andar },
+      { key: "status", header: "Ativa", value: item => item.status !== false },
+      { key: "revisao", header: "Revisão", value: item => item.revisao },
+    ],
+  };
 
   const tableData = filteredOverviewData
     ? filteredOverviewData.slice((page - 1) * 20, page * 20)
@@ -498,11 +521,12 @@ export default function ImpressorasPage() {
       </PageHeader>
 
       <ImpressoraOverviewPanel
-        total={overviewTotal || total}
-        items={overviewData}
+        total={overviewPanelTotal}
+        items={overviewPanelData}
         activeFilters={activeOverviewFilters}
         isLoading={overviewLoading}
         onFilter={applyOverviewFilter}
+        exportConfig={overviewExportConfig}
       />
 
       <DataTable

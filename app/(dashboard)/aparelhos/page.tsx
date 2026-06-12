@@ -10,6 +10,7 @@ import {
   type OverviewFilter,
   notifyOverviewFilter,
 } from "@/components/tables/device-overview-panel";
+import type { OverviewExportConfig } from "@/components/tables/overview-export-menu";
 import { PageHeader } from "@/components/layout/page-header";
 import { BoolBadge } from "@/components/dashboard/status-badge";
 import { ForumLinkedIndicator, useForumVinculosResumo } from "@/components/forum/forum-linked-indicator";
@@ -33,6 +34,23 @@ function isAllocated(item: Aparelho) {
     (item.alocacoes_ativas?.length ?? 0) > 0 ||
     Boolean(item.alocacao_ativa)
   );
+}
+
+function allocationNames(item: Aparelho) {
+  return (item.alocacoes_ativas ?? [])
+    .map(alocacao => alocacao.colaborador.nome)
+    .filter(Boolean)
+    .join(", ") || item.alocacao_ativa?.colaborador.nome || "Livre";
+}
+
+function allocationDetails(item: Aparelho) {
+  return (item.alocacoes_ativas ?? [])
+    .map(alocacao => {
+      const setor = alocacao.colaborador.setor_rel?.nome;
+      const desde = alocacao.data_inicio ? `desde ${alocacao.data_inicio}` : null;
+      return [alocacao.colaborador.nome, setor, desde].filter(Boolean).join(" · ");
+    })
+    .join("; ") || allocationNames(item);
 }
 
 function hasMissingPhoneData(item: Aparelho) {
@@ -329,6 +347,40 @@ export default function AparelhosPage() {
           ),
         )
       : null;
+  const overviewPanelData =
+    filteredOverviewData ?? overviewData;
+  const overviewPanelTotal =
+    filteredOverviewData?.length ??
+    (overviewTotal || total);
+  const overviewExportConfig: OverviewExportConfig<Aparelho> = {
+    title: "Overview de Aparelhos",
+    filename: "overview-aparelhos",
+    rows: overviewPanelData,
+    activeFilters: activeOverviewFilters,
+    columns: [
+      { key: "modelo", header: "Modelo", value: item => item.modelo },
+      { key: "tipo", header: "Tipo", value: item => item.tipo },
+      { key: "ip", header: "IP", value: item => item.endereco_ip },
+      { key: "mac", header: "MAC", value: item => item.endereco_mac },
+      { key: "setor", header: "Setor", value: item => getAparelhoSetor(item) },
+      { key: "localidade", header: "Localidade", value: item => item.localidade_nome },
+      { key: "uso", header: "Uso", value: item => isAllocated(item) ? "Ocupado" : "Livre" },
+      { key: "chip", header: "Com chip", value: item => item.chip === true },
+      { key: "status", header: "Ativo", value: item => item.status !== false },
+      { key: "colaboradores", header: "Colaboradores", value: item => allocationNames(item) },
+      { key: "relacao_alocacao", header: "Relação de alocação", value: item => allocationDetails(item) },
+    ],
+    pdfColumns: [
+      { key: "modelo", header: "Modelo", value: item => item.modelo },
+      { key: "tipo", header: "Tipo", value: item => item.tipo },
+      { key: "ip", header: "IP", value: item => item.endereco_ip },
+      { key: "setor", header: "Setor", value: item => getAparelhoSetor(item) },
+      { key: "localidade", header: "Localidade", value: item => item.localidade_nome },
+      { key: "colaboradores", header: "Colaborador alocado", value: item => allocationNames(item) },
+      { key: "chip", header: "Com chip", value: item => item.chip === true },
+      { key: "status", header: "Ativo", value: item => item.status !== false },
+    ],
+  };
 
   const tableData = filteredOverviewData
     ? filteredOverviewData.slice(
@@ -725,12 +777,13 @@ export default function AparelhosPage() {
 
       <DeviceOverviewPanel
         title="Aparelhos"
-        total={overviewTotal || total}
-        items={overviewData}
+        total={overviewPanelTotal}
+        items={overviewPanelData}
         accentClassName="bg-cyan-500"
         activeFilters={activeOverviewFilters}
         isLoading={overviewLoading}
         onFilter={applyOverviewFilter}
+        exportConfig={overviewExportConfig}
       />
 
       <DataTable

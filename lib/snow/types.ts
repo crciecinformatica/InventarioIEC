@@ -61,6 +61,9 @@ export type SnowProcessedItem = {
   bloqueado_ate: Date | null
   planner_status?: 'pendente' | 'assumido' | 'concluido'
   planner_task_id?: string | null
+  csc_numero?: string | null
+  csc_criado_em?: Date | string | null
+  csc_atualizado_em?: Date | string | null
   atendente_nome?: string | null
   atendente_codigo_pessoa?: string | null
   assumido_em?: Date | string | null

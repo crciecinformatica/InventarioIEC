@@ -421,6 +421,9 @@ model solicitacoes_snow_itens {
   bloqueado_ate           DateTime?         @db.Timestamptz(6)
   planner_status          String            @default("pendente")
   planner_task_id         String?
+  csc_numero              String?
+  csc_criado_em           DateTime?         @db.Timestamptz(6)
+  csc_atualizado_em       DateTime?         @db.Timestamptz(6)
   atendente_nome          String?
   atendente_codigo_pessoa String?
   assumido_em             DateTime?         @db.Timestamptz(6)
@@ -436,6 +439,7 @@ model solicitacoes_snow_itens {
   @@index([ip], map: "idx_solicitacoes_snow_itens_ip")
   @@index([hostname], map: "idx_solicitacoes_snow_itens_hostname")
   @@index([planner_status], map: "idx_solicitacoes_snow_itens_planner_status")
+  @@index([csc_numero], map: "idx_solicitacoes_snow_itens_csc_numero")
   @@index([atendente_codigo_pessoa], map: "idx_solicitacoes_snow_itens_atendente_codigo")
 }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type CSSProperties, type ReactNode } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import {
   Activity,
   AlertTriangle,
@@ -18,6 +19,7 @@ import { cn, formatDate } from '@/lib/utils'
 import type { AlocacaoAtiva } from '@/types'
 import { ACAO_LABELS, type AuditLog } from '@/lib/audit-constants'
 import { toast } from 'sonner'
+import { OverviewExportMenu, type OverviewExportConfig } from '@/components/tables/overview-export-menu'
 
 export interface DeviceOverviewItem {
   id: string
@@ -104,6 +106,7 @@ interface DeviceOverviewPanelProps<T extends DeviceOverviewItem> {
   activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
 }
 
 interface ImpressoraOverviewPanelProps {
@@ -126,6 +129,7 @@ interface ImpressoraOverviewPanelProps {
   activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
 }
 
 interface RackOverviewPanelProps {
@@ -141,8 +145,10 @@ interface RackOverviewPanelProps {
     portas_livres: number | null
     created_at: string | null
   }>
+  activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
 }
 
 interface ColaboradorOverviewPanelProps {
@@ -173,6 +179,7 @@ interface ColaboradorOverviewPanelProps {
   activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
 }
 
 interface AuditOverviewPanelProps {
@@ -181,6 +188,7 @@ interface AuditOverviewPanelProps {
   activeFilters?: ActiveOverviewFilterState[]
   isLoading?: boolean
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
 }
 
 type PieChartItem = {
@@ -374,6 +382,15 @@ function getOverviewFilterKey(filter: { kind: string; value?: string }) {
   return `${filter.kind}:${filter.value ?? ''}`
 }
 
+function getOverviewTransitionKey(activeFilters?: ActiveOverviewFilterState[], locationId?: string | null) {
+  const filterKey = (activeFilters ?? [])
+    .map(getOverviewFilterKey)
+    .sort()
+    .join('|') || 'all'
+
+  return `${locationId ?? 'all-locations'}:${filterKey}`
+}
+
 function getFilterColor(filter?: { color?: string; tone?: 'default' | 'success' | 'warning' | 'danger' }) {
   if (filter?.color) return filter.color
   if (filter?.tone === 'success') return '#10b981'
@@ -507,6 +524,7 @@ function OverviewShell({
   beforeContent,
   activeFilters,
   onFilter,
+  exportConfig,
   isLoading = false,
 }: {
   title: string
@@ -524,6 +542,7 @@ function OverviewShell({
   beforeContent?: ReactNode
   activeFilters?: ActiveOverviewFilterState[]
   onFilter?: (filter: OverviewFilter) => void
+  exportConfig?: OverviewExportConfig<any>
   isLoading?: boolean
 }) {
   const sections: OverviewListSection[] = listSections ?? [{
@@ -533,6 +552,7 @@ function OverviewShell({
     emptyMessage: emptyMessage ?? 'Sem dados para compor este painel.',
   }]
   const activeFilterKeys = new Set((activeFilters ?? []).map(getOverviewFilterKey))
+  const transitionKey = getOverviewTransitionKey(activeFilters)
 
   return (
     <section className="mb-5 rounded-xl border border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -541,15 +561,34 @@ function OverviewShell({
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Overview geral</p>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
         </div>
-        <span className={cn('flex h-9 w-9 items-center justify-center rounded-lg text-white', accentClassName)}>
-          {icon}
-        </span>
+        <div className="flex items-center gap-2">
+          {exportConfig && <OverviewExportMenu config={exportConfig} />}
+          <span className={cn('flex h-9 w-9 items-center justify-center rounded-lg text-white', accentClassName)}>
+            {icon}
+          </span>
+        </div>
       </div>
 
+      <AnimatePresence mode="wait" initial={false}>
       {isLoading ? (
-        <OverviewLoading accentClassName={accentClassName} />
+        <motion.div
+          key="overview-loading"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <OverviewLoading accentClassName={accentClassName} />
+        </motion.div>
       ) : (
-        <div className="space-y-4">
+        <motion.div
+          key={transitionKey}
+          className="space-y-4"
+          initial={{ opacity: 0, y: 10, filter: 'blur(2px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+        >
           {beforeContent}
           <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
             {metrics.map(metric => (
@@ -607,8 +646,9 @@ function OverviewShell({
               ))}
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </section>
   )
 }
@@ -651,8 +691,16 @@ function LocationScopeAccordion({
         </span>
         <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-slate-400 transition', open && 'rotate-180')} />
       </button>
+      <AnimatePresence initial={false}>
       {open && (
-        <div className="grid gap-2 border-t border-slate-100 p-3 dark:border-slate-800 sm:grid-cols-2 xl:grid-cols-4">
+        <motion.div
+          initial={{ opacity: 0, height: 0, y: -4 }}
+          animate={{ opacity: 1, height: 'auto', y: 0 }}
+          exit={{ opacity: 0, height: 0, y: -4 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          className="overflow-hidden border-t border-slate-100 dark:border-slate-800"
+        >
+        <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-4">
           <button
             type="button"
             onClick={() => onSelect(null)}
@@ -701,7 +749,9 @@ function LocationScopeAccordion({
             </button>
           ))}
         </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -714,6 +764,7 @@ export function DeviceOverviewPanel<T extends DeviceOverviewItem>({
   activeFilters = [],
   isLoading = false,
   onFilter,
+  exportConfig,
 }: DeviceOverviewPanelProps<T>) {
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
   const locations = buildLocationScopes(items)
@@ -767,6 +818,7 @@ export function DeviceOverviewPanel<T extends DeviceOverviewItem>({
     .sort((a, b) => b.total - a.total)
   const coloredSectors = applyDistinctColors(sectors)
   const activeFilterKeys = new Set(activeFilters.map(getOverviewFilterKey))
+  const transitionKey = getOverviewTransitionKey(activeFilters, selectedLocationId)
   function applyLocationScope(location: { id: string; label: string } | null) {
     setSelectedLocationId(location?.id ?? null)
     onFilter?.({ kind: 'location', value: location?.id, label: location ? `Unidade: ${location.label}` : 'Todas as unidades' })
@@ -784,15 +836,34 @@ export function DeviceOverviewPanel<T extends DeviceOverviewItem>({
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Overview geral</p>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
         </div>
-        <span className={cn('flex h-9 w-9 items-center justify-center rounded-lg text-white', accentClassName)}>
-          <Activity className="h-4 w-4" />
-        </span>
+        <div className="flex items-center gap-2">
+          {exportConfig && <OverviewExportMenu config={exportConfig} />}
+          <span className={cn('flex h-9 w-9 items-center justify-center rounded-lg text-white', accentClassName)}>
+            <Activity className="h-4 w-4" />
+          </span>
+        </div>
       </div>
 
+      <AnimatePresence mode="wait" initial={false}>
       {isLoading ? (
-        <OverviewLoading accentClassName={accentClassName} />
+        <motion.div
+          key="overview-loading"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <OverviewLoading accentClassName={accentClassName} />
+        </motion.div>
       ) : (
-      <div className="space-y-4">
+      <motion.div
+        key={transitionKey}
+        className="space-y-4"
+        initial={{ opacity: 0, y: 10, filter: 'blur(2px)' }}
+        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
+        transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+      >
         <LocationScopeAccordion
           locations={locations}
           selectedLocationId={selectedLocationId}
@@ -987,8 +1058,9 @@ export function DeviceOverviewPanel<T extends DeviceOverviewItem>({
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
       )}
+      </AnimatePresence>
     </section>
   )
 }
@@ -999,6 +1071,7 @@ export function ImpressoraOverviewPanel({
   activeFilters = [],
   isLoading = false,
   onFilter,
+  exportConfig,
 }: ImpressoraOverviewPanelProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
   const locations = buildLocationScopes(items)
@@ -1083,12 +1156,13 @@ export function ImpressoraOverviewPanel({
       ]}
       activeFilters={activeFilters}
       onFilter={onFilter}
+      exportConfig={exportConfig}
       isLoading={isLoading}
     />
   )
 }
 
-export function RackOverviewPanel({ total, items, isLoading = false, onFilter }: RackOverviewPanelProps) {
+export function RackOverviewPanel({ total, items, activeFilters = [], isLoading = false, onFilter, exportConfig }: RackOverviewPanelProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
   const locationScopes = buildLocationScopes(items)
   const scopedItems = filterByLocation(items, selectedLocationId)
@@ -1165,7 +1239,9 @@ export function RackOverviewPanel({ total, items, isLoading = false, onFilter }:
           emptyMessage: 'Nenhum rack proximo da ocupacao maxima.',
         },
       ]}
+      activeFilters={activeFilters}
       onFilter={onFilter}
+      exportConfig={exportConfig}
       isLoading={isLoading}
     />
   )
@@ -1179,6 +1255,7 @@ export function ColaboradorOverviewPanel({
   activeFilters = [],
   isLoading = false,
   onFilter,
+  exportConfig,
 }: ColaboradorOverviewPanelProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
   const locations = buildLocationScopes(items)
@@ -1249,6 +1326,7 @@ export function ColaboradorOverviewPanel({
       ]}
       activeFilters={activeFilters}
       onFilter={onFilter}
+      exportConfig={exportConfig}
       isLoading={isLoading}
     />
   )
@@ -1302,7 +1380,7 @@ export function notifyOverviewFilter(filters: ActiveOverviewFilterState[]) {
   ), { id: toastId })
 }
 
-export function AuditOverviewPanel({ total, items, activeFilters, isLoading = false, onFilter }: AuditOverviewPanelProps) {
+export function AuditOverviewPanel({ total, items, activeFilters, isLoading = false, onFilter, exportConfig }: AuditOverviewPanelProps) {
   const scopedItems = items
   const analyzedTotal = scopedItems.length
   const displayedTotal = total || analyzedTotal
@@ -1393,6 +1471,7 @@ export function AuditOverviewPanel({ total, items, activeFilters, isLoading = fa
       ]}
       onFilter={onFilter}
       activeFilters={activeFilters}
+      exportConfig={exportConfig}
       isLoading={isLoading}
     />
   )

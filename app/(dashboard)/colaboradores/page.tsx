@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/tables/data-table'
 import { ColaboradorOverviewPanel, type OverviewFilter, notifyOverviewFilter } from '@/components/tables/device-overview-panel'
+import type { OverviewExportConfig } from '@/components/tables/overview-export-menu'
 import { PageHeader } from '@/components/layout/page-header'
 import { StatusBadge } from '@/components/dashboard/status-badge'
 import { ColaboradorModal } from '@/components/modals/colaborador-modal'
@@ -120,6 +121,28 @@ export default function ColaboradoresPage() {
     : null
   const metricOverviewData = selectedSectorOverviewData ?? overviewData
   const metricOverviewTotal = selectedSectorOverviewData ? selectedSectorOverviewData.length : overviewTotal || total
+  const overviewPanelData = filteredOverviewData ?? overviewData
+  const overviewPanelTotal = filteredOverviewData?.length ?? (overviewTotal || total)
+  const overviewMetricData = filteredOverviewData ?? metricOverviewData
+  const overviewMetricTotal = filteredOverviewData?.length ?? metricOverviewTotal
+  const overviewExportConfig: OverviewExportConfig<Colaborador> = {
+    title: 'Overview de Colaboradores',
+    filename: 'overview-colaboradores',
+    rows: overviewPanelData,
+    activeFilters: activeOverviewFilters,
+    columns: [
+      { key: 'codigo', header: 'Código', value: item => item.codigo },
+      { key: 'nome', header: 'Nome', value: item => item.nome },
+      { key: 'status', header: 'Status', value: item => item.status },
+      { key: 'setor', header: 'Setor', value: item => getColaboradorSetor(item) },
+      { key: 'localidade', header: 'Localidade', value: item => item.localidade_nome },
+      { key: 'maquinas', header: 'Máquinas ativas', value: item => item.alocacoes_maquinas_ativas ?? 0 },
+      { key: 'notebooks', header: 'Notebooks ativos', value: item => item.alocacoes_notebooks_ativas ?? 0 },
+      { key: 'aparelhos', header: 'Aparelhos ativos', value: item => item.alocacoes_aparelhos_ativas ?? 0 },
+      { key: 'ramais', header: 'Ramais ativos', value: item => item.alocacoes_ramais_ativas ?? 0 },
+      { key: 'sem_alocacao', header: 'Sem alocação', value: item => item.status === 'Ativo' && !item.alocacoes_maquinas_ativas && !item.alocacoes_notebooks_ativas && !item.alocacoes_aparelhos_ativas && !item.alocacoes_ramais_ativas },
+    ],
+  }
   const tableData = filteredOverviewData
     ? filteredOverviewData.slice((page - 1) * 20, page * 20)
     : data
@@ -295,13 +318,14 @@ export default function ColaboradoresPage() {
         </button>)}
       </PageHeader>
       <ColaboradorOverviewPanel
-        total={overviewTotal || total}
-        items={overviewData}
-        metricTotal={metricOverviewTotal}
-        metricItems={metricOverviewData}
+        total={overviewPanelTotal}
+        items={overviewPanelData}
+        metricTotal={overviewMetricTotal}
+        metricItems={overviewMetricData}
         activeFilters={activeOverviewFilters}
         isLoading={overviewLoading}
         onFilter={applyOverviewFilter}
+        exportConfig={overviewExportConfig}
       />
       <DataTable
         columns={columns}
