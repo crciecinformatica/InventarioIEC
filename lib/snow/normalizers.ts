@@ -52,7 +52,11 @@ export function normalizeHostname(value: unknown) {
 
 export function parseOptionalDate(value: unknown) {
   if (!value) return null
-  const date = new Date(String(value))
+  const raw = String(value).trim()
+  const normalized = /^\d{1,2}:\d{2}(?::\d{2})?$/.test(raw)
+    ? `${new Date().toISOString().slice(0, 10)}T${raw.length === 5 ? `${raw}:00` : raw}`
+    : raw
+  const date = new Date(normalized)
   return Number.isNaN(date.getTime()) ? null : date
 }
 

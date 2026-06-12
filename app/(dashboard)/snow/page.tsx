@@ -64,6 +64,9 @@ type SnowItem = {
   bloqueado_ate: string | null
   planner_status?: string | null
   planner_task_id?: string | null
+  csc_numero?: string | null
+  csc_criado_em?: string | null
+  csc_atualizado_em?: string | null
   atendente_nome?: string | null
   atendente_codigo_pessoa?: string | null
   assumido_em?: string | null
@@ -801,6 +804,8 @@ export default function SnowPage() {
       { key: 'identificador', header: 'Identificador', value: item => item.maquina?.identificador },
       { key: 'status', header: 'Status SNOW', value: item => STATUS_LABELS[item.status] ?? item.status },
       { key: 'planner', header: 'Status Planner', value: item => STATUS_LABELS[item.planner_status || 'pendente'] ?? item.planner_status ?? 'Pendente' },
+      { key: 'csc_numero', header: 'Chamado CSC', value: item => item.csc_numero },
+      { key: 'csc_criado_em', header: 'Criado no CSC', value: item => item.csc_criado_em },
       { key: 'colaborador', header: 'Colaborador', value: item => item.colaborador_alocado },
       { key: 'setor', header: 'Setor', value: item => item.setor_alocado },
       { key: 'localidade', header: 'Localidade', value: item => item.localidade_alocada },
@@ -1289,6 +1294,14 @@ export default function SnowPage() {
                 <p className="mt-1 font-medium text-slate-800 dark:text-slate-100">
                   {formatDateTime(operationalInspect.planner_status === 'concluido' ? operationalInspect.concluido_em : operationalInspect.assumido_em)}
                 </p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70 md:col-span-2">
+                <p className="text-xs text-slate-500">Chamado CSC</p>
+                <p className="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{operationalInspect.csc_numero || 'Não vinculado'}</p>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs text-slate-500">Criado no CSC</p>
+                <p className="mt-1 font-medium text-slate-800 dark:text-slate-100">{formatDateTime(operationalInspect.csc_criado_em)}</p>
               </div>
             </div>
 

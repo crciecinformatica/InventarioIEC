@@ -521,6 +521,66 @@ export const snowOpenApiSpec = {
         },
       },
     },
+    '/api/snow/itens/{id}/csc': {
+      post: {
+        tags: ['SNOW - Chamadas externas'],
+        summary: 'Registrar chamado CSC do item SNOW',
+        description:
+          'Recebe o número do chamado CSC e o horário em que o chamado foi criado na plataforma CSC para vincular ao item SNOW.',
+        security: [{ snowBearerAuth: [] }, { snowApiKey: [] }],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID do item SNOW retornado em `sections[].itens[].id`.',
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/SnowCscPayload' },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Chamado CSC registrado com sucesso.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SnowCscAcompanhamento' },
+              },
+            },
+          },
+          '400': {
+            description: 'Payload inválido.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '401': {
+            description: 'Token de integração ausente ou inválido.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+          '404': {
+            description: 'Item SNOW não encontrado.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -598,6 +658,9 @@ export const snowOpenApiSpec = {
             example: 'pendente',
           },
           planner_task_id: { type: 'string', nullable: true },
+          csc_numero: { type: 'string', nullable: true },
+          csc_criado_em: { type: 'string', format: 'date-time', nullable: true },
+          csc_atualizado_em: { type: 'string', format: 'date-time', nullable: true },
           atendente_nome: { type: 'string', nullable: true },
           atendente_codigo_pessoa: { type: 'string', nullable: true },
           assumido_em: { type: 'string', format: 'date-time', nullable: true },
@@ -693,6 +756,24 @@ export const snowOpenApiSpec = {
           },
         },
       },
+      SnowCscPayload: {
+        type: 'object',
+        required: ['csc_numero', 'csc_criado_em'],
+        properties: {
+          csc_numero: {
+            type: 'string',
+            description: 'Número do chamado na plataforma CSC.',
+            example: 'CSC-20260612-00123',
+          },
+          csc_criado_em: {
+            type: 'string',
+            format: 'date-time',
+            description:
+              'Data/hora de criação do chamado no CSC. Também aceita horário no formato HH:mm ou HH:mm:ss.',
+            example: '2026-06-12T14:35:00-03:00',
+          },
+        },
+      },
       SnowPlannerAcompanhamento: {
         type: 'object',
         properties: {
@@ -707,6 +788,21 @@ export const snowOpenApiSpec = {
           assumido_em: { type: 'string', format: 'date-time', nullable: true },
           concluido_em: { type: 'string', format: 'date-time', nullable: true },
           conclusao_observacao: { type: 'string', nullable: true },
+          planner_atualizado_em: { type: 'string', format: 'date-time', nullable: true },
+        },
+      },
+      SnowCscAcompanhamento: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          csc_numero: { type: 'string', nullable: true },
+          csc_criado_em: { type: 'string', format: 'date-time', nullable: true },
+          csc_atualizado_em: { type: 'string', format: 'date-time', nullable: true },
+          planner_status: {
+            type: 'string',
+            enum: ['pendente', 'assumido', 'concluido'],
+          },
+          planner_task_id: { type: 'string', nullable: true },
           planner_atualizado_em: { type: 'string', format: 'date-time', nullable: true },
         },
       },

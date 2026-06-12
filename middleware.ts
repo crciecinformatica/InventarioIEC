@@ -4,6 +4,7 @@ import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server
 const SNOW_EXTERNAL_PATHS = [
   /^\/api\/snow\/processar-xlsx$/,
   /^\/api\/snow\/itens\/[^/]+\/assumir$/,
+  /^\/api\/snow\/itens\/[^/]+\/csc$/,
   /^\/api\/snow\/itens\/[^/]+\/concluir$/,
 ]
 
