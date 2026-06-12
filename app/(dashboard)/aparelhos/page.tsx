@@ -36,6 +36,23 @@ function isAllocated(item: Aparelho) {
   );
 }
 
+function allocationNames(item: Aparelho) {
+  return (item.alocacoes_ativas ?? [])
+    .map(alocacao => alocacao.colaborador.nome)
+    .filter(Boolean)
+    .join(", ") || item.alocacao_ativa?.colaborador.nome || "Livre";
+}
+
+function allocationDetails(item: Aparelho) {
+  return (item.alocacoes_ativas ?? [])
+    .map(alocacao => {
+      const setor = alocacao.colaborador.setor_rel?.nome;
+      const desde = alocacao.data_inicio ? `desde ${alocacao.data_inicio}` : null;
+      return [alocacao.colaborador.nome, setor, desde].filter(Boolean).join(" · ");
+    })
+    .join("; ") || allocationNames(item);
+}
+
 function hasMissingPhoneData(item: Aparelho) {
   return [
     item.modelo,
@@ -350,7 +367,18 @@ export default function AparelhosPage() {
       { key: "uso", header: "Uso", value: item => isAllocated(item) ? "Ocupado" : "Livre" },
       { key: "chip", header: "Com chip", value: item => item.chip === true },
       { key: "status", header: "Ativo", value: item => item.status !== false },
-      { key: "colaboradores", header: "Colaboradores", value: item => (item.alocacoes_ativas ?? []).map(alocacao => alocacao.colaborador.nome).join(", ") },
+      { key: "colaboradores", header: "Colaboradores", value: item => allocationNames(item) },
+      { key: "relacao_alocacao", header: "Relação de alocação", value: item => allocationDetails(item) },
+    ],
+    pdfColumns: [
+      { key: "modelo", header: "Modelo", value: item => item.modelo },
+      { key: "tipo", header: "Tipo", value: item => item.tipo },
+      { key: "ip", header: "IP", value: item => item.endereco_ip },
+      { key: "setor", header: "Setor", value: item => getAparelhoSetor(item) },
+      { key: "localidade", header: "Localidade", value: item => item.localidade_nome },
+      { key: "colaboradores", header: "Colaborador alocado", value: item => allocationNames(item) },
+      { key: "chip", header: "Com chip", value: item => item.chip === true },
+      { key: "status", header: "Ativo", value: item => item.status !== false },
     ],
   };
 

@@ -28,6 +28,24 @@ function isAllocated(item: Ramal) {
   return (item.alocacoes_ativas?.length ?? 0) > 0 || Boolean(item.alocacao_ativa)
 }
 
+function allocationNames(item: Ramal) {
+  return (item.alocacoes_ativas ?? [])
+    .map(alocacao => alocacao.colaborador.nome)
+    .filter(Boolean)
+    .join(', ') || item.alocacao_ativa?.colaborador.nome || 'Livre'
+}
+
+function allocationDetails(item: Ramal) {
+  return (item.alocacoes_ativas ?? [])
+    .map(alocacao => {
+      const setor = alocacao.colaborador.setor_rel?.nome
+      const desde = alocacao.data_inicio ? `desde ${alocacao.data_inicio}` : null
+      const whatsapp = alocacao.whatsapp ? 'WhatsApp' : null
+      return [alocacao.colaborador.nome, setor, desde, whatsapp].filter(Boolean).join(' · ')
+    })
+    .join('; ') || allocationNames(item)
+}
+
 function hasWhatsapp(item: Ramal) {
   return item.alocacao_ativa?.whatsapp === true || (item.alocacoes_ativas ?? []).some(allocation => allocation.whatsapp === true)
 }
@@ -268,8 +286,19 @@ export default function RamaisPage() {
       { key: 'whatsapp', header: 'WhatsApp', value: item => hasWhatsapp(item) },
       { key: 'fila', header: 'Fila', value: item => item.fila === true },
       { key: 'disponibilidade', header: 'Disponibilidade', value: item => item.disponibilidade },
-      { key: 'colaboradores', header: 'Colaboradores', value: item => (item.alocacoes_ativas ?? []).map(alocacao => alocacao.colaborador.nome).join(', ') },
+      { key: 'colaboradores', header: 'Colaboradores', value: item => allocationNames(item) },
+      { key: 'relacao_alocacao', header: 'Relação de alocação', value: item => allocationDetails(item) },
       { key: 'ultima_revisao', header: 'Última revisão', value: item => item.ultima_revisao },
+    ],
+    pdfColumns: [
+      { key: 'numero', header: 'Ramal', value: item => item.numero_ramal },
+      { key: 'prefixo', header: 'Prefixo', value: item => item.prefixo_telefonico },
+      { key: 'setor', header: 'Setor', value: item => getRamalSetor(item) },
+      { key: 'localidade', header: 'Localidade', value: item => item.localidade_nome },
+      { key: 'colaboradores', header: 'Colaborador alocado', value: item => allocationNames(item) },
+      { key: 'disponibilidade', header: 'Disponibilidade', value: item => item.disponibilidade },
+      { key: 'whatsapp', header: 'WhatsApp', value: item => hasWhatsapp(item) },
+      { key: 'fila', header: 'Fila', value: item => item.fila === true },
     ],
   }
   const tableData = filteredOverviewData

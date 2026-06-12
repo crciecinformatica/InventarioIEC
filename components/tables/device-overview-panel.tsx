@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type CSSProperties, type ReactNode } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import {
   Activity,
   AlertTriangle,
@@ -381,6 +382,15 @@ function getOverviewFilterKey(filter: { kind: string; value?: string }) {
   return `${filter.kind}:${filter.value ?? ''}`
 }
 
+function getOverviewTransitionKey(activeFilters?: ActiveOverviewFilterState[], locationId?: string | null) {
+  const filterKey = (activeFilters ?? [])
+    .map(getOverviewFilterKey)
+    .sort()
+    .join('|') || 'all'
+
+  return `${locationId ?? 'all-locations'}:${filterKey}`
+}
+
 function getFilterColor(filter?: { color?: string; tone?: 'default' | 'success' | 'warning' | 'danger' }) {
   if (filter?.color) return filter.color
   if (filter?.tone === 'success') return '#10b981'
@@ -542,6 +552,7 @@ function OverviewShell({
     emptyMessage: emptyMessage ?? 'Sem dados para compor este painel.',
   }]
   const activeFilterKeys = new Set((activeFilters ?? []).map(getOverviewFilterKey))
+  const transitionKey = getOverviewTransitionKey(activeFilters)
 
   return (
     <section className="mb-5 rounded-xl border border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -558,10 +569,26 @@ function OverviewShell({
         </div>
       </div>
 
+      <AnimatePresence mode="wait" initial={false}>
       {isLoading ? (
-        <OverviewLoading accentClassName={accentClassName} />
+        <motion.div
+          key="overview-loading"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <OverviewLoading accentClassName={accentClassName} />
+        </motion.div>
       ) : (
-        <div className="space-y-4">
+        <motion.div
+          key={transitionKey}
+          className="space-y-4"
+          initial={{ opacity: 0, y: 10, filter: 'blur(2px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+        >
           {beforeContent}
           <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
             {metrics.map(metric => (
@@ -619,8 +646,9 @@ function OverviewShell({
               ))}
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </section>
   )
 }
@@ -663,8 +691,16 @@ function LocationScopeAccordion({
         </span>
         <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-slate-400 transition', open && 'rotate-180')} />
       </button>
+      <AnimatePresence initial={false}>
       {open && (
-        <div className="grid gap-2 border-t border-slate-100 p-3 dark:border-slate-800 sm:grid-cols-2 xl:grid-cols-4">
+        <motion.div
+          initial={{ opacity: 0, height: 0, y: -4 }}
+          animate={{ opacity: 1, height: 'auto', y: 0 }}
+          exit={{ opacity: 0, height: 0, y: -4 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          className="overflow-hidden border-t border-slate-100 dark:border-slate-800"
+        >
+        <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-4">
           <button
             type="button"
             onClick={() => onSelect(null)}
@@ -713,7 +749,9 @@ function LocationScopeAccordion({
             </button>
           ))}
         </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -780,6 +818,7 @@ export function DeviceOverviewPanel<T extends DeviceOverviewItem>({
     .sort((a, b) => b.total - a.total)
   const coloredSectors = applyDistinctColors(sectors)
   const activeFilterKeys = new Set(activeFilters.map(getOverviewFilterKey))
+  const transitionKey = getOverviewTransitionKey(activeFilters, selectedLocationId)
   function applyLocationScope(location: { id: string; label: string } | null) {
     setSelectedLocationId(location?.id ?? null)
     onFilter?.({ kind: 'location', value: location?.id, label: location ? `Unidade: ${location.label}` : 'Todas as unidades' })
@@ -805,10 +844,26 @@ export function DeviceOverviewPanel<T extends DeviceOverviewItem>({
         </div>
       </div>
 
+      <AnimatePresence mode="wait" initial={false}>
       {isLoading ? (
-        <OverviewLoading accentClassName={accentClassName} />
+        <motion.div
+          key="overview-loading"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <OverviewLoading accentClassName={accentClassName} />
+        </motion.div>
       ) : (
-      <div className="space-y-4">
+      <motion.div
+        key={transitionKey}
+        className="space-y-4"
+        initial={{ opacity: 0, y: 10, filter: 'blur(2px)' }}
+        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
+        transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+      >
         <LocationScopeAccordion
           locations={locations}
           selectedLocationId={selectedLocationId}
@@ -1003,8 +1058,9 @@ export function DeviceOverviewPanel<T extends DeviceOverviewItem>({
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
       )}
+      </AnimatePresence>
     </section>
   )
 }

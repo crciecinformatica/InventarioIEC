@@ -28,6 +28,23 @@ function isAllocated(item: Maquina) {
   return (item.alocacoes_ativas?.length ?? 0) > 0 || Boolean(item.alocacao_ativa)
 }
 
+function allocationNames(item: Maquina) {
+  return (item.alocacoes_ativas ?? [])
+    .map(alocacao => alocacao.colaborador.nome)
+    .filter(Boolean)
+    .join(', ') || item.alocacao_ativa?.colaborador.nome || 'Livre'
+}
+
+function allocationDetails(item: Maquina) {
+  return (item.alocacoes_ativas ?? [])
+    .map(alocacao => {
+      const setor = alocacao.colaborador.setor_rel?.nome
+      const desde = alocacao.data_inicio ? `desde ${alocacao.data_inicio}` : null
+      return [alocacao.colaborador.nome, setor, desde].filter(Boolean).join(' · ')
+    })
+    .join('; ') || allocationNames(item)
+}
+
 function missing(value: unknown) {
   if (typeof value === 'string') return value.trim().length === 0
   return value === null || value === undefined
@@ -175,9 +192,20 @@ export default function MaquinasPage() {
       { key: 'setor', header: 'Setor', value: item => getMaquinaSetor(item) },
       { key: 'localidade', header: 'Localidade', value: item => item.localidade_nome },
       { key: 'uso', header: 'Uso', value: item => isAllocated(item) ? 'Ocupada' : 'Livre' },
-      { key: 'colaboradores', header: 'Colaboradores', value: item => (item.alocacoes_ativas ?? []).map(alocacao => alocacao.colaborador.nome).join(', ') },
+      { key: 'colaboradores', header: 'Colaboradores', value: item => allocationNames(item) },
+      { key: 'relacao_alocacao', header: 'Relação de alocação', value: item => allocationDetails(item) },
       { key: 'patrimonio_cpu', header: 'Patrimônio CPU', value: item => item.patrimonio_cpu },
       { key: 'patrimonio_monitor', header: 'Patrimônio Monitor', value: item => item.patrimonio_monitor },
+      { key: 'data_revisao', header: 'Última revisão', value: item => item.data_revisao },
+    ],
+    pdfColumns: [
+      { key: 'endereco_ip', header: 'IP', value: item => item.endereco_ip },
+      { key: 'nome_host', header: 'Host', value: item => item.nome_host },
+      { key: 'modelo', header: 'Modelo', value: item => item.modelo },
+      { key: 'setor', header: 'Setor', value: item => getMaquinaSetor(item) },
+      { key: 'localidade', header: 'Localidade', value: item => item.localidade_nome },
+      { key: 'colaboradores', header: 'Colaborador alocado', value: item => allocationNames(item) },
+      { key: 'patrimonio_cpu', header: 'Patrimônio CPU', value: item => item.patrimonio_cpu },
       { key: 'data_revisao', header: 'Última revisão', value: item => item.data_revisao },
     ],
   }
